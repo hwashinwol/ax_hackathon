@@ -1,0 +1,607 @@
+<title>Corevia 장려금 결재 시스템</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 기획서 본문(좁은 칼럼) + 시연 섹션만 넓게. 와이어프레임은 저채도 회색 톤, 판단 상태만 의미 색상 */
+:root{
+  --bg:#F3F4F1; --surface:#FFFFFF; --ink:#1B1F24; --muted:#5E6670; --line:#D5D9D4; --wf:#ECEEEA;
+  --accent:#1D5C8C; --accent-soft:#E2ECF4; --on-accent:#FFFFFF;
+  --ok:#2E7D4F; --ok-soft:#E1F1E7; --warn:#9A6200; --warn-soft:#FBF0D9; --crit:#B3261E; --crit-soft:#F8E1DE;
+  --f-sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14171A; --surface:#1C2024; --ink:#E7EAEC; --muted:#9AA3AC; --line:#323840; --wf:#252A30;
+  --accent:#74AEDB; --accent-soft:#1D3144; --on-accent:#0E1A24;
+  --ok:#6CC08F; --ok-soft:#17301F; --warn:#E3B356; --warn-soft:#352A10; --crit:#F08A80; --crit-soft:#3B1D1A; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#14171A; --surface:#1C2024; --ink:#E7EAEC; --muted:#9AA3AC; --line:#323840; --wf:#252A30;
+  --accent:#74AEDB; --accent-soft:#1D3144; --on-accent:#0E1A24;
+  --ok:#6CC08F; --ok-soft:#17301F; --warn:#E3B356; --warn-soft:#352A10; --crit:#F08A80; --crit-soft:#3B1D1A; color-scheme:dark;}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-sans);font-size:15px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 80px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+.narrow{max-width:760px}
+h1,h2,h3{text-wrap:balance;margin:0;line-height:1.3}
+h1{font-size:2rem;font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.35rem;font-weight:700}
+h3{font-size:1rem;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.lead{color:var(--muted);max-width:65ch}
+section{display:flex;flex-direction:column;gap:20px}
+.sec-head{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:20px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:620px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:.78rem;letter-spacing:.03em;background:var(--wf)}
+tr:last-child td{border-bottom:0}
+.tbd{display:inline-block;font-family:var(--f-mono);font-size:.7rem;padding:1px 6px;border-radius:3px;border:1px dashed var(--warn);color:var(--warn);white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.crit{background:var(--crit-soft);color:var(--crit)} .pill.info{background:var(--accent-soft);color:var(--accent)}
+.pill.neutral{background:var(--wf);color:var(--muted)}
+
+/* 4단계 스트립 */
+.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden}
+.flow > div{padding:16px;display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--line);min-width:0}
+.flow > div:last-child{border-right:0}
+.flow .k{font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+.flow p{font-size:.86rem;color:var(--muted)}
+.branches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.branch{border:1px solid var(--line);border-radius:6px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:8px;min-width:0}
+.branch p{font-size:.88rem;color:var(--muted)}
+@media (max-width:760px){.flow{grid-template-columns:1fr}.flow>div{border-right:0;border-bottom:1px solid var(--line)}.flow>div:last-child{border-bottom:0}.branches{grid-template-columns:1fr}}
+
+/* 상태 다이어그램 */
+.diagram{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px}
+
+/* ===== 시연 플레이어 ===== */
+.player{display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.player{grid-template-columns:1fr}}
+.scn-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.scn-tabs button{font:inherit;font-size:.86rem;padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.scn-tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.steps li{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:.84rem;cursor:pointer;color:var(--muted)}
+.steps li:last-child{border-bottom:0}
+.steps li .n{font-family:var(--f-mono);font-size:.75rem;padding-top:1px}
+.steps li.done{color:var(--ink)}
+.steps li.cur{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.steps li.cur .n{color:var(--accent)}
+.steps .who{display:block;font-size:.72rem;font-weight:400;color:var(--muted)}
+.ctrl{display:flex;gap:8px}
+.btn{font:inherit;font-size:.86rem;padding:8px 14px;border-radius:5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.btn.danger{background:var(--surface);color:var(--crit);border-color:var(--crit)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:focus-visible,.scn-tabs button:focus-visible,.steps li:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* 와이어프레임 앱 프레임 */
+.app{border:1.5px solid var(--ink);border-radius:8px;background:var(--surface);overflow:hidden;min-width:0}
+.app-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1.5px solid var(--ink);flex-wrap:wrap}
+.app-top .brand{font-weight:700;font-size:.9rem}
+.app-top .role{font-size:.78rem;color:var(--muted);display:flex;gap:8px;align-items:center}
+.app-body{display:grid;grid-template-columns:150px minmax(0,1fr) 230px;min-height:520px}
+.nav{border-right:1px solid var(--line);padding:12px 8px;display:flex;flex-direction:column;gap:2px;background:var(--wf)}
+.nav span{font-size:.8rem;padding:6px 10px;border-radius:4px;color:var(--muted);display:flex;justify-content:space-between}
+.nav span.on{background:var(--surface);color:var(--ink);font-weight:600;border:1px solid var(--line)}
+.nav b{font-family:var(--f-mono);font-size:.7rem;font-weight:500;background:var(--crit);color:var(--surface);border-radius:8px;padding:0 6px}
+.main{padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.log{border-left:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--wf);min-width:0}
+.log h4{margin:0;font-size:.75rem;font-family:var(--f-mono);letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.log ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.log li{font-size:.75rem;line-height:1.45;border-left:2px solid var(--line);padding-left:8px}
+.log li.new{border-left-color:var(--accent)}
+.log li .t{font-family:var(--f-mono);color:var(--muted);display:block;font-size:.68rem}
+@media (max-width:900px){.app-body{grid-template-columns:minmax(0,1fr)}.nav{flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--line)}.log{border-left:0;border-top:1px solid var(--line)}}
+
+.scr-title{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.scr-title h3{font-size:1.02rem}
+.box{border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.box.dash{border-style:dashed}
+.box.ai{border-color:var(--accent);background:var(--accent-soft)}
+.box.hold{border-color:var(--warn);background:var(--warn-soft)}
+.box.crit{border-color:var(--crit);background:var(--crit-soft)}
+.box.okb{border-color:var(--ok);background:var(--ok-soft)}
+.ai-tag{font-family:var(--f-mono);font-size:.7rem;color:var(--accent);letter-spacing:.06em}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.grid2{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--muted)}
+.field .v{border:1px solid var(--line);border-radius:4px;padding:7px 10px;color:var(--ink);font-size:.86rem;background:var(--surface)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.84rem}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.sig{display:grid;grid-template-columns:120px minmax(0,1fr) 54px;gap:10px;align-items:center;font-size:.8rem}
+.bar{height:8px;background:var(--wf);border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%;background:var(--accent)}
+.big{font-size:1.9rem;font-weight:700;font-family:var(--f-mono);line-height:1}
+.small{font-size:.78rem;color:var(--muted)}
+.mini-tbl{width:100%;min-width:0;font-size:.82rem}
+.mini-tbl th,.mini-tbl td{padding:7px 8px}
+.stack{position:relative;height:40px;background:var(--wf);border:1px solid var(--line);border-radius:4px;display:flex;overflow:visible}
+.stack i{display:flex;align-items:center;justify-content:center;font-size:.72rem;font-style:normal;color:var(--on-accent);white-space:nowrap;overflow:hidden}
+.stack .a{background:var(--accent)} .stack .b{background:var(--accent);opacity:.65}
+.stack .th{position:absolute;top:-6px;bottom:-6px;border-left:2px dashed var(--crit)}
+.stack .th em{position:absolute;top:-20px;left:-30px;font-size:.68rem;font-style:normal;color:var(--crit);white-space:nowrap;font-family:var(--f-mono)}
+.check{display:flex;flex-direction:column;gap:6px;font-size:.84rem;margin:0;padding:0;list-style:none}
+.check li{display:flex;gap:8px;align-items:baseline}
+.check .m{font-family:var(--f-mono);font-size:.8rem;width:18px;flex:none}
+.check .m.ok{color:var(--ok)} .check .m.x{color:var(--crit)} .check .m.w{color:var(--warn)}
+.modal-scrim{background:var(--wf);border-radius:6px;padding:18px;display:flex;justify-content:center}
+.modal{width:100%;max-width:440px;background:var(--surface);border:1.5px solid var(--ink);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.ph{height:12px;border-radius:3px;background:var(--wf)}
+.note{font-size:.78rem;color:var(--muted);border-left:2px solid var(--line);padding-left:10px}
+.hot{outline:2px dashed var(--accent);outline-offset:3px;border-radius:5px}
+
+/* 화면 인벤토리 */
+.screens{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.scard{border:1px solid var(--line);border-radius:6px;padding:14px;background:var(--surface);display:flex;flex-direction:column;gap:6px;min-width:0}
+.scard .id{font-family:var(--f-mono);font-size:.72rem;color:var(--accent)}
+.scard p{font-size:.84rem;color:var(--muted)}
+.scard ul{margin:0;padding-left:18px;font-size:.82rem}
+.scope{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.scope{grid-template-columns:1fr}}
+.scope ul{margin:0;padding-left:18px;font-size:.88rem;display:flex;flex-direction:column;gap:4px}
+@media (prefers-reduced-motion:no-preference){.main{animation:fade .25s ease}}
+@keyframes fade{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style>
+
+<div class="wrap">
+
+<header class="narrow" style="display:flex;flex-direction:column;gap:12px">
+  <span class="eyebrow">Aurora Group · Corevia Cosmetics · MVP 기획 v0.1</span>
+  <h1>관련 거래처 판매장려금 결재 시스템</h1>
+  <p class="lead">영업팀은 A대리점과 B쇼핑몰을 한 사장님의 관련 거래처로 보고 실적 합산 장려금을 요청하고, 재무·내부감시팀은 서류상 명의가 달라 배임 리스크를 이유로 지급을 막습니다. 이 시스템은 AI가 동일 지배구조 근거를 점수로 제시하고, 합산 실적·품질 리스크·현금 사정을 순서대로 판단해 결재와 대안까지 한 화면 흐름으로 처리합니다.</p>
+  <p class="small">화면의 거래처·금액·점수는 모두 <b>예시 데이터</b>입니다. 실제 운영 데이터와 외부 인사이트는 추후 업로드 화면(S0)으로 입력합니다. <span class="tbd">입력 예정</span> 표시는 값이 아직 정해지지 않은 파라미터입니다.</p>
+</header>
+
+<section>
+  <div class="sec-head narrow">
+    <span class="eyebrow">1 · 처리 구조</span>
+    <h2>기본 4단계와 두 개의 분기</h2>
+  </div>
+  <div class="flow">
+    <div><span class="k">① 확인</span><h3>AI 거래처 매칭</h3><p>대표자명·연락처·사업장 주소·등록 IP·정산계좌로 동일 지배구조 확률을 계산하고 근거를 함께 보여줍니다.</p></div>
+    <div><span class="k">② 판단</span><h3>실적 합산·조건 검증</h3><p>그룹 누적 매출을 합산해 지급 기준(Threshold) 초과 여부와 장려금액을 자동 계산합니다.</p></div>
+    <div><span class="k">③ 승인 요청</span><h3>재무·내부감시 결재</h3><p>매칭 확률과 근거, 합산 실적을 담은 결재 팝업을 재무팀과 내부감시팀에 순차 발송합니다.</p></div>
+    <div><span class="k">④ 처리</span><h3>지급 / 상태 변경</h3><p>승인되면 현금 지급, 거절되면 사유에 맞는 대안 프로세스로 넘깁니다. 모든 판단은 감사 로그에 남습니다.</p></div>
+  </div>
+  <div class="branches">
+    <div class="branch"><span class="pill warn">분기 A · 나만의 확장</span><h3>악성 품질 클레임 거래처 자동 보류</h3><p>실적을 충족해도 최근 기간 내 품질팀이 '악의적'으로 판정한 클레임이 3회 이상이면 결재로 넘기지 않고 <b>보류(Pending)</b> 처리합니다. 영업팀·품질팀에 소명 요청 알림을 보내고, 품질팀이 해제해야 결재가 재개됩니다.</p></div>
+    <div class="branch"><span class="pill info">분기 B · 다른 부서 영향</span><h3>현금 거절 시 Masil 재고 할인 대체</h3><p>재무팀이 그룹 현금흐름 악화로 현금 지급을 거절하면, AI가 동일 금액을 유통 자회사 Masil의 다음 발주에 <b>재고 할인(Credit)</b>으로 반영하는 안을 제안합니다. 영업·재무 양측이 수락하면 지급 계획이 바뀝니다.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head narrow">
+    <span class="eyebrow">2 · 시연 시나리오 (영상 녹화용)</span>
+    <h2>와이어프레임으로 보는 3가지 흐름</h2>
+    <p class="lead">시나리오를 고르고 <span class="mono">다음 ▶</span> 또는 키보드 ← → 로 단계를 넘기면 됩니다. 점선 테두리는 그 단계에서 사용자가 누르는 지점입니다. 오른쪽 이벤트 로그는 감사 로그에 쌓이는 기록입니다.</p>
+  </div>
+  <div class="scn-tabs" role="tablist" id="scnTabs">
+    <button role="tab" id="tab-1" data-s="1" aria-selected="true">① 정상 작동</button>
+    <button role="tab" id="tab-2" data-s="2" aria-selected="false">② 품질 클레임 보류</button>
+    <button role="tab" id="tab-3" data-s="3" aria-selected="false">③ 현금 거절 → 대체 지급</button>
+  </div>
+  <div class="player">
+    <div class="side">
+      <ol class="steps" id="steps"></ol>
+      <div class="ctrl">
+        <button class="btn" id="prev">◀ 이전</button>
+        <button class="btn primary" id="next">다음 ▶</button>
+        <button class="btn" id="reset">처음</button>
+      </div>
+      <p class="note" id="stepNote"></p>
+    </div>
+    <div class="app" aria-live="polite">
+      <div class="app-top">
+        <span class="brand">Corevia · 장려금 운영</span>
+        <span class="role">접속 역할 <span class="pill neutral" id="roleBadge">영업팀</span></span>
+      </div>
+      <div class="app-body">
+        <nav class="nav" id="nav"></nav>
+        <div class="main" id="main"></div>
+        <aside class="log"><h4>이벤트 로그</h4><ol id="log"></ol></aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head narrow">
+    <span class="eyebrow">3 · 상태 흐름</span>
+    <h2>장려금 요청 건의 상태 머신</h2>
+    <p class="lead">요청 1건은 아래 상태 중 하나에만 있습니다. 상태가 바뀔 때마다 누가, 어떤 근거로 바꿨는지 감사 로그에 기록합니다.</p>
+  </div>
+  <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  direction LR
+  state "요청 접수<br/>REQUESTED" as REQ
+  state "매칭 검토<br/>MATCHING" as MAT
+  state "수동 검토<br/>MANUAL_REVIEW" as MAN
+  state "기준 미달<br/>NOT_ELIGIBLE" as NE
+  state "리스크 검사<br/>RISK_CHECK" as RISK
+  state "보류<br/>PENDING" as PEN
+  state "결재 대기<br/>AWAITING_APPROVAL" as AWA
+  state "지급 완료<br/>PAID" as PAID
+  state "거절<br/>REJECTED" as REJ
+  state "대안 제안<br/>ALT_PROPOSED" as ALT
+  state "크레딧 예약<br/>CREDIT_SCHEDULED" as CRS
+  state "크레딧 정산<br/>CREDIT_SETTLED" as CST
+  state "종결<br/>CLOSED" as CLO
+  [*] --> REQ
+  REQ --> MAT: AI 매칭 실행
+  MAT --> MAN: 점수 70~89
+  MAN --> MAT: 내부감시 확인
+  MAT --> NE: 합산 실적 미달
+  MAT --> RISK: 점수 90+ 및 실적 충족
+  RISK --> PEN: 악성 클레임 3회+
+  PEN --> RISK: 품질팀 해제
+  PEN --> CLO: 소명 기각
+  RISK --> AWA: 리스크 없음
+  AWA --> PAID: 재무+내부감시 승인
+  AWA --> REJ: 거절
+  REJ --> ALT: 사유 = 현금 부족
+  REJ --> CLO: 기타 사유
+  ALT --> CRS: 영업·재무 수락
+  ALT --> CLO: 대안 거절
+  CRS --> CST: Masil 발주 시 차감
+  PAID --> [*]
+  CST --> [*]
+  NE --> [*]
+  CLO --> [*]
+</pre>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>상태</th><th>진입 조건</th><th>담당</th><th>알림</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill neutral">REQUESTED</span></td><td>영업팀이 기준 거래처를 선택하고 장려금 요청 생성</td><td>영업</td><td>없음</td></tr>
+        <tr><td><span class="pill info">MATCHING</span></td><td>AI 매칭 + 실적 합산 계산 (자동)</td><td>시스템</td><td>없음</td></tr>
+        <tr><td><span class="pill warn">MANUAL_REVIEW</span></td><td>매칭 점수가 애매한 구간 <span class="tbd">70~89 입력 예정</span></td><td>내부감시</td><td>내부감시팀</td></tr>
+        <tr><td><span class="pill warn">PENDING</span></td><td>그룹 내 거래처 중 하나라도 악성 클레임 기준 초과</td><td>품질 · 영업</td><td>영업팀 · 품질팀 경고</td></tr>
+        <tr><td><span class="pill info">AWAITING_APPROVAL</span></td><td>매칭·실적·리스크 모두 통과</td><td>재무 → 내부감시</td><td>결재 팝업</td></tr>
+        <tr><td><span class="pill ok">PAID</span></td><td>두 결재 모두 승인, 지급 처리 완료</td><td>재무</td><td>영업팀</td></tr>
+        <tr><td><span class="pill crit">REJECTED</span></td><td>결재자 중 1명이라도 거절 (사유 코드 필수)</td><td>재무 / 내부감시</td><td>영업팀</td></tr>
+        <tr><td><span class="pill info">ALT_PROPOSED</span></td><td>거절 사유가 <span class="mono">CASH_SHORTAGE</span></td><td>시스템 제안 → 영업·재무 수락</td><td>영업 · 재무</td></tr>
+        <tr><td><span class="pill info">CREDIT_SCHEDULED</span></td><td>양측 수락, Masil 다음 발주에 차감 예약</td><td>Masil 연동</td><td>Masil 담당자</td></tr>
+        <tr><td><span class="pill ok">CREDIT_SETTLED</span></td><td>Masil 발주서에 할인 반영 확인</td><td>시스템</td><td>영업 · 재무</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head narrow">
+    <span class="eyebrow">4 · 화면 목록</span>
+    <h2>MVP에 필요한 화면 8개</h2>
+  </div>
+  <div class="screens">
+    <div class="scard"><span class="id">S0 · 데이터 연결</span><h3>데이터 업로드</h3><p>운영 데이터·외부 인사이트를 넣는 곳. 지금은 비어 있고 추후 입력.</p><ul><li>거래처 마스터 CSV/Excel 업로드</li><li>매출 실적(월별) 업로드</li><li>품질 클레임 이력 업로드</li><li>컬럼 매핑 · 검증 결과</li></ul></div>
+    <div class="scard"><span class="id">S1 · 요청함</span><h3>장려금 요청 목록</h3><p>역할별로 내가 처리할 건을 상태 필터로 보여줍니다.</p><ul><li>상태 필 · 요청금액 · 경과일</li><li>보류/결재대기 배지</li><li>새 요청 버튼(영업)</li></ul></div>
+    <div class="scard"><span class="id">S2 · 새 요청</span><h3>요청 작성</h3><p>영업팀이 기준 거래처와 정산 기간을 고르고 매칭을 실행합니다.</p><ul><li>거래처 검색 · 기간 선택</li><li>관련 거래처 후보 직접 추가</li><li>요청 사유 메모</li></ul></div>
+    <div class="scard"><span class="id">S3 · 매칭 결과</span><h3>관련 거래처 그룹</h3><p>매칭 확률과 신호별 근거. 내부감시팀이 근거를 그대로 보고 판단합니다.</p><ul><li>신호별 가중치 막대</li><li>그룹 구성 거래처 표</li><li>그룹 확정 / 제외</li></ul></div>
+    <div class="scard"><span class="id">S4 · 실적 검증</span><h3>합산 실적과 기준선</h3><p>거래처별 매출을 쌓은 막대와 기준선, 장려금 계산식.</p><ul><li>개별 vs 합산 비교</li><li>장려금 = 합산 × 요율</li><li>리스크 검사 결과 체크리스트</li></ul></div>
+    <div class="scard"><span class="id">S5 · 결재</span><h3>승인 팝업</h3><p>재무 → 내부감시 순차 결재. 거절은 사유 코드 필수.</p><ul><li>요약 카드(확률·실적·금액)</li><li>승인 / 거절 + 사유 선택</li><li>현금흐름 지표 참고 영역</li></ul></div>
+    <div class="scard"><span class="id">S6 · 보류·대안</span><h3>예외 처리</h3><p>보류 경고와 소명 스레드, 현금 거절 시 대체 지급 제안.</p><ul><li>클레임 이력 표 · 소명 제출</li><li>대안 카드(크레딧 조건)</li><li>영업·재무 각각 수락</li></ul></div>
+    <div class="scard"><span class="id">S7 · 감사 로그</span><h3>판단 이력</h3><p>매칭 근거, 계산값, 결재자, 시각을 변경 불가 기록으로 남깁니다.</p><ul><li>요청 건별 타임라인</li><li>CSV 내보내기(내부 감사용)</li></ul></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head narrow">
+    <span class="eyebrow">5 · 판단 규칙</span>
+    <h2>MVP 판단 로직과 조정 파라미터</h2>
+    <p class="lead">MVP는 설명 가능한 규칙 기반 점수로 시작합니다. 결재자가 "왜 95%인가"를 신호별로 확인할 수 있어야 배임 우려를 풀 수 있기 때문입니다. 데이터가 쌓이면 가중치를 학습 모델로 교체합니다.</p>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>단계</th><th>규칙</th><th>기본값 (예시)</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td>① 매칭</td><td>신호별 가중 합산 점수<br><span class="small">대표자명 30 · 연락처 25 · 사업장 주소 20 · 등록 IP 15 · 정산계좌 예금주 10</span></td><td class="mono">100점 만점</td><td>가중치 <span class="tbd">입력 예정</span> · 주소는 도로명 정규화 후 비교</td></tr>
+        <tr><td>① 매칭</td><td>점수 구간별 처리</td><td class="mono">≥90 자동 그룹 · 70~89 수동 검토 · &lt;70 미그룹</td><td>구간 <span class="tbd">입력 예정</span></td></tr>
+        <tr><td>② 실적</td><td>정산 기간 내 그룹 매출 합계 ≥ 지급 기준</td><td class="mono">기간 분기 · 기준 3억 원</td><td>기준·기간 <span class="tbd">입력 예정</span></td></tr>
+        <tr><td>② 실적</td><td>장려금 = 합산 매출 × 요율 (구간별 요율 가능)</td><td class="mono">2%</td><td>요율표 <span class="tbd">입력 예정</span></td></tr>
+        <tr><td>예외 A</td><td>최근 N개월 품질팀 '악의적' 판정 클레임 수 ≥ 3 → 보류</td><td class="mono">N = 6개월</td><td>'악의적' 판정은 품질팀이 클레임 건별로 입력</td></tr>
+        <tr><td>③ 결재</td><td>결재선: 재무팀 → 내부감시팀 (금액 초과 시 지주사 추가)</td><td class="mono">지주사 기준 <span class="tbd">입력 예정</span></td><td>지주사 결재선은 MVP 이후</td></tr>
+        <tr><td>예외 B</td><td>거절 사유 = 현금 부족이면 Masil 다음 발주 크레딧 제안</td><td class="mono">크레딧 = 장려금 100% · 유효 90일</td><td>크레딧 비율·유효기간 <span class="tbd">입력 예정</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head narrow">
+    <span class="eyebrow">6 · 데이터</span>
+    <h2>필요 데이터와 핵심 테이블</h2>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>테이블</th><th>주요 컬럼</th><th>출처</th><th>용도</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">accounts</td><td>account_id, 상호, 사업자번호, 대표자명, 연락처, 사업장주소, 등록IP, 정산계좌 예금주, 채널(대리점/온라인몰)</td><td>Corevia 거래처 DB <span class="tbd">업로드 예정</span></td><td>① 매칭</td></tr>
+        <tr><td class="mono">sales</td><td>account_id, 기간(월), 매출액, 반품액</td><td>ERP 매출 <span class="tbd">업로드 예정</span></td><td>② 합산</td></tr>
+        <tr><td class="mono">quality_claims</td><td>claim_id, account_id, 접수일, 유형, 판정(정상/악의적), 판정자</td><td>품질팀 <span class="tbd">업로드 예정</span></td><td>예외 A</td></tr>
+        <tr><td class="mono">account_groups</td><td>group_id, account_id, match_score, 신호별 점수(JSON), 확정자, 확정일</td><td>시스템 생성</td><td>① 결과 저장</td></tr>
+        <tr><td class="mono">incentive_requests</td><td>request_id, group_id, 기간, 합산매출, 기준, 요율, 장려금액, status, 요청자</td><td>시스템 생성</td><td>상태 머신</td></tr>
+        <tr><td class="mono">approvals</td><td>request_id, 결재단계, 결재자, 결정(승인/거절), 사유코드, 메모, 시각</td><td>시스템 생성</td><td>③ 결재</td></tr>
+        <tr><td class="mono">credits</td><td>credit_id, request_id, 금액, 유효기한, masil_po_id, 차감일</td><td>Masil 발주 연동 <span class="tbd">방식 미정</span></td><td>예외 B</td></tr>
+        <tr><td class="mono">cash_signals</td><td>월, 가용현금, 지출한도, 메모</td><td>재무팀 입력 / 지주사 인사이트 <span class="tbd">입력 예정</span></td><td>결재 참고 · AI 대안 판단</td></tr>
+        <tr><td class="mono">audit_log</td><td>event_id, request_id, actor, action, before/after, payload, 시각</td><td>시스템 생성</td><td>S7 · 내부 감사</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head narrow">
+    <span class="eyebrow">7 · 역할과 권한</span>
+    <h2>부서별로 할 수 있는 일</h2>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>기능</th><th>영업팀</th><th>재무팀</th><th>내부감시팀</th><th>품질팀</th><th>Masil</th></tr></thead>
+      <tbody>
+        <tr><td>요청 생성 · 매칭 실행</td><td>●</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+        <tr><td>매칭 근거 열람</td><td>●</td><td>●</td><td>●</td><td>–</td><td>–</td></tr>
+        <tr><td>수동 검토 그룹 확정</td><td>–</td><td>–</td><td>●</td><td>–</td><td>–</td></tr>
+        <tr><td>결재 승인 / 거절</td><td>–</td><td>● 1차</td><td>● 2차</td><td>–</td><td>–</td></tr>
+        <tr><td>클레임 판정 · 보류 해제</td><td>–</td><td>–</td><td>열람</td><td>●</td><td>–</td></tr>
+        <tr><td>소명 제출</td><td>●</td><td>–</td><td>–</td><td>●</td><td>–</td></tr>
+        <tr><td>대안(크레딧) 수락</td><td>●</td><td>●</td><td>열람</td><td>–</td><td>–</td></tr>
+        <tr><td>크레딧 차감 확인</td><td>열람</td><td>열람</td><td>열람</td><td>–</td><td>●</td></tr>
+        <tr><td>데이터 업로드 (S0)</td><td>매출</td><td>현금지표</td><td>–</td><td>클레임</td><td>발주</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head narrow">
+    <span class="eyebrow">8 · 범위</span>
+    <h2>MVP에서 만드는 것과 미루는 것</h2>
+  </div>
+  <div class="scope">
+    <div class="branch"><h3>MVP 포함</h3><ul>
+      <li>S0~S7 화면, 역할 전환으로 시연</li>
+      <li>규칙 기반 매칭 점수 + 신호별 근거 표시</li>
+      <li>합산 실적·장려금 자동 계산</li>
+      <li>악성 클레임 자동 보류 + 영업·품질 알림</li>
+      <li>재무 → 내부감시 2단계 결재, 사유 코드</li>
+      <li>현금 부족 거절 시 Masil 크레딧 대안 제안·수락</li>
+      <li>감사 로그 (변경 불가 기록)</li>
+    </ul></div>
+    <div class="branch"><h3>MVP 이후</h3><ul>
+      <li>학습 기반 매칭 모델(가중치 자동 조정)</li>
+      <li>Masil 발주 시스템 실시간 API 연동 (MVP는 수기 확인)</li>
+      <li>지주사(Aurora Holdings) 고액 결재선</li>
+      <li>그룹 현금흐름 예측과 지급 시점 추천</li>
+      <li>메신저·메일 알림 연동 (MVP는 앱 내 알림)</li>
+    </ul></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+const won = n => n.toLocaleString('ko-KR') + '원';
+const eok = n => (n/1e8).toFixed(2).replace(/\.?0+$/,'') + '억';
+const D = {
+  A:{name:'A대리점', ch:'대리점', biz:'214-8*-*****', sales:182000000},
+  B:{name:'B쇼핑몰', ch:'온라인몰', biz:'567-1*-*****', sales:151000000},
+  threshold:300000000, rate:0.02, reqId:'INC-2026-Q4-0137'
+};
+D.total = D.A.sales + D.B.sales; D.amount = Math.round(D.total*D.rate);
+const SIG = [['대표자명','김○훈 = 김○훈',30,30],['연락처','010-****-4821 동일',25,25],['사업장 주소','동일 건물, 층만 다름',20,18],['등록 IP','동일 /24 대역',15,14],['정산계좌 예금주','예금주 동일, 은행 다름',10,8]];
+const score = SIG.reduce((s,x)=>s+x[3],0);
+
+const NAV = ['요청함','거래처 그룹','결재함','알림','감사 로그','데이터 연결'];
+
+/* ---------- 화면 렌더러 ---------- */
+const S = {
+ dash: (o) => `
+  <div class="scr-title"><h3>장려금 요청함</h3><button class="btn primary hot">+ 새 요청</button></div>
+  <div class="row"><span class="pill info">전체 12</span><span class="pill neutral">결재 대기 3</span><span class="pill warn">보류 1</span><span class="pill ok">지급 완료 7</span></div>
+  <div class="tbl-wrap"><table class="mini-tbl"><thead><tr><th>요청번호</th><th>거래처 그룹</th><th>금액</th><th>상태</th></tr></thead><tbody>
+   <tr><td class="mono">…-0131</td><td>C약국 외 1</td><td class="mono">4,200,000</td><td><span class="pill ok">PAID</span></td></tr>
+   <tr><td class="mono">…-0134</td><td>D몰</td><td class="mono">–</td><td><span class="pill neutral">NOT_ELIGIBLE</span></td></tr>
+   <tr><td class="mono">…-0136</td><td>E대리점 외 2</td><td class="mono">9,050,000</td><td><span class="pill info">AWAITING</span></td></tr>
+  </tbody></table></div>
+  <p class="small">영업팀 화면. 새 요청을 눌러 A대리점 장려금 요청을 시작합니다.</p>`,
+
+ request: () => `
+  <div class="scr-title"><h3>새 장려금 요청</h3><span class="pill neutral">REQUESTED</span></div>
+  <div class="grid2">
+   <div class="field">기준 거래처<div class="v">A대리점 (${D.A.biz})</div></div>
+   <div class="field">정산 기간<div class="v">2026 Q3 (07.01 ~ 09.30)</div></div>
+  </div>
+  <div class="field">요청 사유<div class="v">B쇼핑몰과 동일 대표 운영. 합산 시 분기 기준 초과 예상.</div></div>
+  <div class="box dash"><span class="small">관련 거래처 후보 (영업 입력, 선택)</span><div class="row"><span class="pill neutral">B쇼핑몰 ✕</span><span class="small">+ 추가</span></div></div>
+  <div class="row"><button class="btn primary hot">AI 관련 거래처 매칭 실행</button><button class="btn">임시 저장</button></div>`,
+
+ match: () => `
+  <div class="scr-title"><h3>관련 거래처 매칭 결과</h3><span class="pill info">MATCHING</span></div>
+  <div class="box ai">
+   <span class="ai-tag">AI 판단</span>
+   <div class="row" style="justify-content:space-between"><div><div class="big">${score}%</div><span class="small">동일 지배구조 확률</span></div>
+   <p style="max-width:40ch;font-size:.88rem">A대리점과 B쇼핑몰은 <b>${score}% 확률로 동일 지배구조를 가진 관련 거래처</b>입니다. 자동 그룹 기준(90점) 이상입니다.</p></div>
+  </div>
+  <div class="box"><h3 style="font-size:.86rem">신호별 근거</h3>
+   ${SIG.map(s=>`<div class="sig"><span>${s[0]}<br><span class="small">${s[1]}</span></span><div class="bar"><i style="width:${s[3]/s[2]*100}%"></i></div><span class="mono">${s[3]}/${s[2]}</span></div>`).join('')}
+  </div>
+  <div class="row"><button class="btn primary hot">그룹 확정 · 실적 합산</button><button class="btn">거래처 제외</button></div>`,
+
+ calc: () => {
+  const max = 380000000, pa = D.A.sales/max*100, pb = D.B.sales/max*100, pt = D.threshold/max*100;
+  return `
+  <div class="scr-title"><h3>실적 합산 · 조건 검증</h3><span class="pill info">MATCHING</span></div>
+  <div class="box">
+   <div class="row" style="justify-content:space-between"><span class="small">2026 Q3 그룹 매출</span><span class="mono">${eok(D.total)} / 기준 ${eok(D.threshold)}</span></div>
+   <div style="padding-top:22px"><div class="stack"><i class="a" style="width:${pa}%">A ${eok(D.A.sales)}</i><i class="b" style="width:${pb}%">B ${eok(D.B.sales)}</i><span class="th" style="left:${pt}%"><em>기준 3억</em></span></div></div>
+   <p class="small">개별로는 A ${eok(D.A.sales)}, B ${eok(D.B.sales)}로 둘 다 미달. 합산하면 기준을 ${eok(D.total-D.threshold)} 초과합니다.</p>
+  </div>
+  <div class="box ai"><span class="ai-tag">AI 계산</span>
+   <dl class="kv"><dt>합산 매출</dt><dd class="mono">${won(D.total)}</dd><dt>요율</dt><dd class="mono">${D.rate*100}%</dd><dt>장려금</dt><dd class="mono"><b>${won(D.amount)}</b></dd></dl>
+  </div>
+  <div class="row"><button class="btn primary hot">리스크 검사 진행</button></div>`;
+ },
+
+ riskPass: () => risk(false),
+ riskFail: () => risk(true),
+
+ approve: (o) => `
+  <div class="scr-title"><h3>결재함</h3><span class="pill info">AWAITING_APPROVAL</span></div>
+  <div class="modal-scrim"><div class="modal">
+   <span class="ai-tag">결재 요청 · ${D.reqId}</span>
+   <h3>합산 실적 충족됨 (매칭 확률 ${score}%). 장려금 지급을 승인하시겠습니까?</h3>
+   <dl class="kv"><dt>그룹</dt><dd>A대리점 + B쇼핑몰</dd><dt>합산 매출</dt><dd class="mono">${won(D.total)}</dd><dt>장려금</dt><dd class="mono"><b>${won(D.amount)}</b> (현금 일시불)</dd><dt>리스크</dt><dd><span class="pill ok">클레임 이상 없음</span></dd></dl>
+   <div class="box dash" style="padding:10px"><span class="small">참고 · 이번 달 그룹 가용현금</span>${o.cash==='low'?'<span class="pill crit">지출한도 대비 92% 소진</span>':'<span class="pill ok">지출한도 대비 48% 사용</span>'}</div>
+   <div class="row"><span class="small">결재선</span><span class="pill ${o.fin==='ok'?'ok':o.fin==='no'?'crit':'info'}">재무팀 ${o.fin==='ok'?'승인':o.fin==='no'?'거절':'검토 중'}</span><span>→</span><span class="pill ${o.aud==='ok'?'ok':'neutral'}">내부감시팀 ${o.aud==='ok'?'승인':'대기'}</span></div>
+   <div class="row" style="justify-content:flex-end">
+    <button class="btn danger ${o.hot==='no'?'hot':''}">거절</button>
+    <button class="btn primary ${o.hot==='ok'?'hot':''}">승인</button>
+   </div>
+  </div></div>`,
+
+ reject: () => `
+  <div class="scr-title"><h3>결재 거절</h3><span class="pill crit">REJECTED</span></div>
+  <div class="modal-scrim"><div class="modal">
+   <h3>거절 사유를 선택하세요</h3>
+   <div class="check" style="gap:8px">
+    <label class="row"><span class="mono">◉</span> <b>CASH_SHORTAGE</b> · 그룹 현금흐름 악화로 현금 지급 불가</label>
+    <label class="row small"><span class="mono">○</span> MATCH_DOUBT · 관련 거래처 근거 부족</label>
+    <label class="row small"><span class="mono">○</span> POLICY · 장려금 정책 위반</label>
+   </div>
+   <div class="field">메모<div class="v">11월 그룹 지출한도 92% 소진. 이번 달 현금 일시불 지급 불가.</div></div>
+   <div class="row" style="justify-content:flex-end"><button class="btn danger hot">거절 확정</button></div>
+  </div></div>`,
+
+ alt: (o) => `
+  <div class="scr-title"><h3>AI 대안 제안</h3><span class="pill info">ALT_PROPOSED</span></div>
+  <div class="box crit"><b>현금 지급 거절됨</b><span class="small">재무팀 · 사유 CASH_SHORTAGE</span></div>
+  <div class="box ai"><span class="ai-tag">AI 대안</span>
+   <h3>Masil 다음 발주 시 '재고 할인(Credit)'으로 대체 지급</h3>
+   <dl class="kv"><dt>크레딧 금액</dt><dd class="mono">${won(D.amount)} (장려금 100%)</dd><dt>적용처</dt><dd>Masil 경유 A대리점·B쇼핑몰 다음 발주서</dd><dt>유효기간</dt><dd class="mono">90일 (~2027.02.07)</dd><dt>현금 영향</dt><dd>이번 달 현금 유출 0원, 매출 할인으로 처리</dd></dl>
+   <p class="small">영업팀은 거래처 약속을 지키고, 재무팀은 이번 달 현금을 지킵니다.</p>
+  </div>
+  <div class="row"><span class="pill ${o.s?'ok':'neutral'}">영업팀 ${o.s?'수락':'대기'}</span><span class="pill ${o.f?'ok':'neutral'}">재무팀 ${o.f?'수락':'대기'}</span></div>
+  <div class="row"><button class="btn primary hot">${o.s?'재무팀으로 수락':'영업팀으로 수락'}</button><button class="btn">조건 수정 요청</button></div>`,
+
+ credit: () => `
+  <div class="scr-title"><h3>지급 계획 변경 완료</h3><span class="pill info">CREDIT_SCHEDULED</span></div>
+  <div class="box okb"><b>현금 지급 → Masil 재고 할인으로 계획 수정됨</b><span class="small">크레딧 CR-0137 · ${won(D.amount)} · 유효 90일</span></div>
+  <div class="box"><h3 style="font-size:.86rem">Masil 발주 연동 (예정)</h3>
+   <table class="mini-tbl"><thead><tr><th>항목</th><th>값</th></tr></thead><tbody>
+    <tr><td>다음 발주 예정</td><td>B쇼핑몰 · 12월 1주</td></tr>
+    <tr><td>차감 방식</td><td>발주 공급가에서 크레딧 우선 차감</td></tr>
+    <tr><td>상태 전환</td><td>발주서 반영 확인 시 CREDIT_SETTLED</td></tr>
+   </tbody></table>
+  </div>
+  <p class="note">MVP에서는 Masil 담당자가 발주서 반영을 수기로 확인합니다. API 연동은 이후 단계.</p>`,
+
+ paid: () => `
+  <div class="scr-title"><h3>지급 완료</h3><span class="pill ok">PAID</span></div>
+  <div class="box okb"><b>${won(D.amount)} 현금 지급 처리됨</b><span class="small">A대리점 정산계좌 · 지급일 2026.11.10</span></div>
+  <div class="box"><dl class="kv"><dt>매칭</dt><dd>${score}% · 내부감시 근거 확인</dd><dt>실적</dt><dd class="mono">${won(D.total)} ≥ ${won(D.threshold)}</dd><dt>결재</dt><dd>재무팀 승인 → 내부감시팀 승인</dd></dl></div>
+  <p class="note">매칭 근거·계산값·결재자가 감사 로그에 남아 배임 소지에 대한 사후 설명 자료가 됩니다.</p>`,
+
+ hold: (o) => `
+  <div class="scr-title"><h3>지급 보류</h3><span class="pill warn">PENDING</span></div>
+  <div class="box hold"><b>⚠ 악성 클레임 이력 감지: 지급 보류 및 사유 소명 요망</b><span class="small">B쇼핑몰 · 최근 6개월 '악의적' 판정 3건 (기준 3건 이상)</span></div>
+  <div class="row"><span class="pill info">→ 영업팀 알림 발송</span><span class="pill info">→ 품질팀 알림 발송</span></div>
+  <div class="box"><h3 style="font-size:.86rem">소명 스레드</h3>
+   <div class="field">영업팀 소명<div class="v" style="color:var(--muted)">소명 내용 입력…</div></div>
+   <div class="row"><button class="btn primary ${o.hot?'hot':''}">소명 제출</button><span class="small">품질팀이 '해제'하면 결재 단계로 재진입, '기각'하면 종결</span></div>
+  </div>`
+};
+function risk(fail){
+  const claims = fail
+   ? [['2026.06.03','B쇼핑몰','포장 파손','악의적'],['2026.07.19','B쇼핑몰','성분 이상 주장','악의적'],['2026.08.28','B쇼핑몰','변질 주장(유통기한 경과 재고)','악의적'],['2026.09.11','A대리점','배송 지연','정상']]
+   : [['2026.08.14','A대리점','라벨 인쇄 불량','정상']];
+  const bad = claims.filter(c=>c[3]==='악의적').length;
+  return `
+  <div class="scr-title"><h3>리스크 검사</h3><span class="pill ${fail?'warn':'info'}">RISK_CHECK</span></div>
+  <ul class="check box">
+   <li><span class="m ok">✓</span>관련 거래처 매칭 ${score}% (자동 그룹 기준 90 이상)</li>
+   <li><span class="m ok">✓</span>합산 실적 기준 초과 (${eok(D.total)} ≥ ${eok(D.threshold)})</li>
+   <li><span class="m ${fail?'x':'ok'}">${fail?'✕':'✓'}</span>품질 클레임: 최근 6개월 악의적 판정 ${bad}건 ${fail?'<span class="pill crit">기준 3건 이상</span>':'(기준 3건 미만)'}</li>
+   <li><span class="m ok">✓</span>거래처 거래정지·연체 이력 없음</li>
+  </ul>
+  <div class="tbl-wrap"><table class="mini-tbl"><thead><tr><th>접수일</th><th>거래처</th><th>유형</th><th>품질팀 판정</th></tr></thead><tbody>
+   ${claims.map(c=>`<tr><td class="mono">${c[0]}</td><td>${c[1]}</td><td>${c[2]}</td><td>${c[3]==='악의적'?'<span class="pill crit">악의적</span>':'<span class="pill neutral">정상</span>'}</td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="box ai"><span class="ai-tag">AI 판단</span><p style="font-size:.88rem">${fail?'블랙리스트 기준에 해당합니다. 결재로 넘기지 않고 <b>자동 보류</b>합니다.':'리스크 없음. 재무팀·내부감시팀 결재로 넘깁니다.'}</p></div>
+  <div class="row"><button class="btn primary hot">${fail?'보류 처리 확인':'결재 요청 발송'}</button></div>`;
+}
+
+/* ---------- 시나리오 ---------- */
+const base = [
+ {s:'dash', role:'영업팀', nav:0, label:'영업팀이 요청함에서 새 요청', log:'영업팀 · 요청 작성 시작'},
+ {s:'request', role:'영업팀', nav:0, label:'기준 거래처·기간 입력, 매칭 실행', log:`요청 ${D.reqId} 생성 · REQUESTED`},
+ {s:'match', role:'영업팀', nav:1, label:`AI 매칭 ${score}% · 그룹 확정`, log:`AI 매칭 A+B = ${score}% · 자동 그룹`},
+ {s:'calc', role:'영업팀', nav:1, label:'합산 실적 기준 초과 확인', log:`합산 ${eok(D.total)} ≥ 기준 ${eok(D.threshold)} · 장려금 ${won(D.amount)}`},
+];
+const SCN = {
+ 1:[...base,
+  {s:'riskPass', role:'시스템', nav:1, label:'리스크 검사 통과', log:'리스크 검사 통과 · AWAITING_APPROVAL'},
+  {s:'approve', o:{fin:'wait',aud:'wait',hot:'ok'}, role:'재무팀', nav:2, label:'재무팀 결재 팝업 → 승인', log:'재무팀에 결재 팝업 발송'},
+  {s:'approve', o:{fin:'ok',aud:'wait',hot:'ok'}, role:'내부감시팀', nav:2, label:'내부감시팀 근거 확인 → 승인', log:'재무팀 승인 · 내부감시팀으로 이관'},
+  {s:'paid', role:'재무팀', nav:0, label:'현금 지급 완료', log:`내부감시팀 승인 · ${won(D.amount)} 지급 · PAID`},
+ ],
+ 2:[...base,
+  {s:'riskFail', role:'시스템', nav:1, label:'악성 클레임 3건 감지', log:'B쇼핑몰 악의적 클레임 3건 감지'},
+  {s:'hold', o:{hot:true}, role:'영업팀', nav:3, label:'자동 보류 · 영업/품질 경고', log:'자동 보류 · PENDING · 영업팀·품질팀 경고 발송'},
+ ],
+ 3:[...base,
+  {s:'riskPass', role:'시스템', nav:1, label:'리스크 검사 통과', log:'리스크 검사 통과 · AWAITING_APPROVAL'},
+  {s:'approve', o:{fin:'wait',aud:'wait',hot:'no',cash:'low'}, role:'재무팀', nav:2, label:'재무팀 결재 팝업 (현금 부족)', log:'재무팀에 결재 팝업 발송 · 가용현금 경고'},
+  {s:'reject', role:'재무팀', nav:2, label:'사유 CASH_SHORTAGE로 거절', log:'재무팀 거절 · 사유 CASH_SHORTAGE · REJECTED'},
+  {s:'alt', o:{s:false,f:false}, role:'영업팀', nav:3, label:'AI가 Masil 크레딧 대안 제안', log:'AI 대안 생성 · ALT_PROPOSED'},
+  {s:'alt', o:{s:true,f:false}, role:'재무팀', nav:3, label:'영업팀 수락 → 재무팀 수락', log:'영업팀 대안 수락'},
+  {s:'credit', role:'재무팀', nav:0, label:'지급 계획 수정 완료', log:`재무팀 수락 · Masil 크레딧 ${won(D.amount)} 예약 · CREDIT_SCHEDULED`},
+ ]
+};
+const NOTES = {
+ 1:'정상 작동: 매칭 성공 → 실적 충족 → 재무·내부감시 승인 → 지급 완료.',
+ 2:'나만의 확장: 실적은 충족했지만 품질 클레임 이력 때문에 AI가 결재 전에 자동 보류합니다.',
+ 3:'다른 부서 영향: 재무팀이 현금 사정으로 거절하자 AI가 Masil 재고 할인 대체 지급을 제안합니다.'
+};
+
+let cur = 1, idx = 0;
+const $ = id => document.getElementById(id);
+const times = ['09:12','09:13','09:13','09:14','09:14','10:02','11:40','14:25','14:26','15:08','15:31'];
+function render(){
+  const steps = SCN[cur], st = steps[idx];
+  $('steps').innerHTML = steps.map((x,i)=>`<li tabindex="0" data-i="${i}" class="${i<idx?'done':''} ${i===idx?'cur':''}"><span class="n">${String(i+1).padStart(2,'0')}</span><span>${x.label}<span class="who">${x.role}</span></span></li>`).join('');
+  $('main').innerHTML = S[st.s](st.o||{});
+  $('main').style.animation='none'; void $('main').offsetWidth; $('main').style.animation='';
+  $('roleBadge').textContent = st.role;
+  const alerts = (cur===2 && st.s==='hold') || (cur===3 && st.s==='alt') ? 1 : 0;
+  $('nav').innerHTML = NAV.map((n,i)=>`<span class="${i===st.nav?'on':''}">${n}${i===3&&alerts?'<b>1</b>':''}</span>`).join('');
+  $('log').innerHTML = steps.slice(0,idx+1).map((x,i)=>`<li class="${i===idx?'new':''}"><span class="t">${times[i]} · ${x.role}</span>${x.log}</li>`).reverse().join('');
+  $('stepNote').textContent = NOTES[cur];
+  $('prev').disabled = idx===0; $('next').disabled = idx===steps.length-1;
+  document.querySelectorAll('#scnTabs button').forEach(b=>b.setAttribute('aria-selected', b.dataset.s==cur));
+}
+$('next').onclick = ()=>{ if(idx<SCN[cur].length-1){idx++;render();} };
+$('prev').onclick = ()=>{ if(idx>0){idx--;render();} };
+$('reset').onclick = ()=>{ idx=0; render(); };
+$('main').addEventListener('click', e=>{ if(e.target.closest('.hot')) $('next').click(); });
+$('steps').addEventListener('click', e=>{ const li=e.target.closest('li'); if(li){idx=+li.dataset.i;render();} });
+$('steps').addEventListener('keydown', e=>{ if(e.key==='Enter'){const li=e.target.closest('li'); if(li){idx=+li.dataset.i;render();}} });
+$('scnTabs').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b){cur=+b.dataset.s; idx=0; render();} });
+document.addEventListener('keydown', e=>{
+  if(e.target.matches('input,textarea')) return;
+  if(e.key==='ArrowRight') $('next').click();
+  if(e.key==='ArrowLeft') $('prev').click();
+});
+render();
+</script>
