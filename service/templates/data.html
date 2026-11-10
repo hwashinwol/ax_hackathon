@@ -7,7 +7,7 @@
   <tbody>
   {% for f in inv %}
   <tr><td class="mono">{{ f.name }}<br><span class="small">{{ f.path }}</span></td><td>{{ f.desc }}</td>
-    <td>{% if f.found %}<span class="pill ok">연결됨</span>{% elif f.optional %}<span class="pill warn">명세 파일 미제공</span>{% else %}<span class="pill crit">없음</span>{% endif %}</td>
+    <td>{% if f.found %}<span class="pill ok">연결됨</span>{% elif f.optional %}<span class="pill warn">선택 파일 없음</span>{% else %}<span class="pill crit">없음</span>{% endif %}</td>
     <td class="num">{{ f.rows if f.rows is not none else '문서' if f.found else '-' }}</td>
     <td class="small mono" style="max-width:360px">{{ f.cols|join(', ') }}</td></tr>
   {% endfor %}
@@ -17,14 +17,14 @@
 
 <div class="grid2">
   <div class="card">
-    <h2>판단 규칙 파라미터 <span class="tbd">입력 예정 · config.py</span></h2>
+    <h2>판단 규칙 파라미터 <span class="small">config.py</span></h2>
     <dl class="kv">
-      <dt>매칭 가중치</dt><dd>자금 연결 {{ RULES.w_account_same }}(교차 입금 {{ RULES.w_cross_deposit }}) · 대표자명 {{ RULES.w_name }} · 주소 {{ RULES.w_addr_exact }}(같은 시 {{ RULES.w_addr_city }})</dd>
-      <dt>매칭 구간</dt><dd>≥{{ RULES.auto_group }} 자동 · ≥{{ RULES.manual_review }} 수동 검토</dd>
-      <dt>합산 기준선</dt><dd>월 {{ RULES.threshold_monthly|won }}</dd>
-      <dt>연체 보류</dt><dd>{{ RULES.overdue_days }}일 초과</dd>
-      <dt>악성 클레임</dt><dd>최근 {{ RULES.malicious_window_months }}개월 {{ RULES.malicious_count }}회 이상 (internal_judgment 필드 필요)</dd>
-      <dt>크레딧</dt><dd>장려금 {{ (RULES.credit_ratio*100)|int }}% · {{ RULES.credit_valid_days }}일 · 분할 시 현금 {{ (RULES.split_cash_ratio*100)|int }}%</dd>
+      <dt>동일 관련자</dt><dd>대표자·주소·정산계좌 중 {{ RULES.related_min_match }}개 이상 일치 · 전이 연결 · 실제 입금 계좌 대조 <span class="small">({{ SRC.related_min_match }})</span></dd>
+      <dt>지급 한도</dt><dd>월 {{ RULES.limit_monthly|won }} 이하 영업지원팀 전결 · 초과 시 영업임원 승인 · 동일 관련자 합산 <span class="small">({{ SRC.limit_monthly }})</span></dd>
+      <dt>연체 경고</dt><dd>{{ RULES.overdue_days }}일 초과 시 결재 화면에 경고 (보류하지 않음) <span class="small">({{ SRC.overdue_days }})</span></dd>
+      <dt>AI 에이전트</dt><dd>{% if ai_on %}<span class="pill ok">연결됨</span> {{ ai_model }}{% else %}<span class="pill warn">미연결</span> 규칙 기반 문구로 대체 중 · ANTHROPIC_API_KEY 설정 필요{% endif %}</dd>
+      <dt>악성 클레임</dt><dd>최근 {{ RULES.malicious_window_months }}개월 {{ RULES.malicious_count }}회 이상 (internal_judgment 필드 필요) <span class="small">({{ SRC.malicious }})</span></dd>
+      <dt>크레딧</dt><dd>장려금 {{ (RULES.credit_ratio*100)|int }}% · {{ RULES.credit_valid_days }}일 · 분할 시 현금 {{ (RULES.split_cash_ratio*100)|int }}% <span class="small">({{ SRC.credit }})</span></dd>
     </dl>
   </div>
   <div class="card">
@@ -33,7 +33,8 @@
       <dt>Corevia</dt><dd class="mono">{{ cash.cv_close|eok }} (최근 월 {{ cash.cv_month_net|eok }})</dd>
       <dt>Masil</dt><dd class="mono">{{ cash.ms_close|eok }} · 하한 {{ cash.covenant|eok }} · 여유 {{ cash.headroom|eok }}</dd>
       <dt>Masil 추세</dt><dd class="mono">{% for k, v in cash.ms_series %}{{ k[2:] }} {{ v|eok }}{{ ' · ' if not loop.last }}{% endfor %}</dd>
-      <dt>하한 도달 추정</dt><dd class="mono">{{ cash.breach_date or '-' }}</dd>
+      <dt>하한 하회 예상</dt><dd class="mono">{{ cash.breach_date or '-' }} <span class="small">({{ cash.breach_basis }}{% if cash.reforecast %} · 최저 {{ cash.reforecast.min_balance|eok }}{% endif %})</span></dd>
+      {% if cash.trend_breach_date %}<dt>추세만 보면</dt><dd class="mono">{{ cash.trend_breach_date }}</dd>{% endif %}
     </dl>
   </div>
 </div>

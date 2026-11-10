@@ -14,6 +14,7 @@
     <a href="{{ url_for('inbox') }}" class="{{ 'on' if ep in ('inbox','detail') }}">요청함</a>
     <a href="{{ url_for('new') }}" class="{{ 'on' if ep=='new' }}">새 요청</a>
     <a href="{{ url_for('notices') }}" class="{{ 'on' if ep=='notices' }}">알림{% if unread %}<span class="badge">{{ unread }}</span>{% endif %}</a>
+    <a href="{{ url_for('quality') }}" class="{{ 'on' if ep=='quality' }}">품질 판정</a>
     <a href="{{ url_for('audit') }}" class="{{ 'on' if ep=='audit' }}">감사 로그</a>
     <a href="{{ url_for('data_page') }}" class="{{ 'on' if ep=='data_page' }}">데이터 연결</a>
   </nav>

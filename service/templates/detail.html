@@ -2,13 +2,13 @@
 {% block title %}{{ r.code }} · Corevia 장려금{% endblock %}
 {% block body %}
 {% set st = r.status %}
-{% set stage = {'REQUESTED':0,'MATCHING':1,'MANUAL_REVIEW':1,'NOT_ELIGIBLE':2,'RISK_CHECK':2,'PENDING':2,'AWAITING_APPROVAL':3}.get(st, 4) %}
+{% set stage = {'REQUESTED':0,'MATCHING':1,'MANUAL_REVIEW':1,'WITHIN_LIMIT':2,'RISK_CHECK':2,'PENDING':2,'AWAITING_APPROVAL':3}.get(st, 4) %}
 <div class="row between">
   <div><span class="small mono">{{ r.code }}</span><h1>{{ anchor.agency_name }} 외 관련 거래처 장려금 · {{ r.period }}</h1></div>
   <span class="pill {{ S[st] }}" style="font-size:.9rem">{{ st }}</span>
 </div>
 <div class="stepper">
-  {% for label in ['① 요청','② AI 거래처 매칭','③ 실적·리스크 검증','④ 재무·내부감시 결재','⑤ 처리'] %}
+  {% for label in ['① 요청','② AI 관련자 판정','③ 합산 한도·리스크 검증','④ 재무·내부감시·임원 결재','⑤ 처리'] %}
   <div class="{{ 'cur' if loop.index0==stage else 'done' if loop.index0<stage }}">{{ label }}</div>
   {% endfor %}
 </div>
@@ -36,27 +36,28 @@
   <div class="card ai">
     <span class="ai-tag">AI 판단 · 관련 거래처 매칭</span>
     {% if m.candidates %}
-      <p>{{ anchor.agency_id }}와(과) 동일 지배구조로 보이는 거래처 {{ m.candidates|length }}곳을 찾았습니다.
-      {% for c in m.candidates %}<b>{{ c.agency_id }} {{ c.score }}점</b>({{ {'auto':'자동 그룹','review':'수동 검토','none':'미그룹'}[c.decision] }}){{ ', ' if not loop.last }}{% endfor %}.
-      자동 그룹 {{ RULES.auto_group }}점 이상 · 수동 검토 {{ RULES.manual_review }}~{{ RULES.auto_group-1 }}점 <span class="tbd">입력 예정</span></p>
+      <p>{{ anchor.agency_id }}의 동일 관련자 후보 {{ m.candidates|length }}곳입니다.
+      {% for c in m.candidates %}<b>{{ c.agency_id }} {{ c.score }}/{{ c.max }}개 일치</b>({{ {'auto':'동일 관련자','review':'수동 검토','none':'미그룹'}[c.decision] }}){{ ', ' if not loop.last }}{% endfor %}.</p>
+      <p class="small">기준: 대표자·주소·정산계좌 중 {{ m.need }}개 이상 일치하면 동일 관련자이고, 관계는 전이적으로 연결합니다. 정산계좌는 실제 입금 계좌도 함께 대조합니다. ({{ SRC.related_min_match }}) 등록 정보가 겹치는 것은 소명·감사 대상이며 부정 확정이 아닙니다.</p>
     {% else %}
-      <p>관련 거래처를 찾지 못했습니다. {{ anchor.agency_id }} 단독 실적으로 판단합니다.</p>
+      <p>동일 관련자를 찾지 못했습니다. {{ anchor.agency_id }} 단독 지급액으로 한도를 봅니다.</p>
     {% endif %}
   </div>
   {% for c in m.candidates %}
   <div class="card">
     <div class="row between">
       <h3>{{ c.agency_id }} {{ c.agency_name }} {% if c.proposed_by_sales %}<span class="pill neutral">영업 입력</span>{% endif %}</h3>
-      <span class="row"><span class="score">{{ c.score }}</span>
+      <span class="row"><span class="score">{{ c.score }}/{{ c.max }}</span>
       {% set rv = r.reviews.get(c.agency_id) %}
-      {% if c.decision=='auto' %}<span class="pill ok">자동 그룹</span>
+      {% if c.decision=='auto' %}<span class="pill ok">동일 관련자{{ ' · ' ~ c.via ~ ' 경유' if c.via }}</span>
       {% elif c.decision=='review' %}{% if rv %}<span class="pill {{ 'ok' if rv.decision=='confirm' else 'neutral' }}">내부감시 {{ '확정' if rv.decision=='confirm' else '제외' }}</span>{% else %}<span class="pill warn">수동 검토 대기</span>{% endif %}
       {% else %}<span class="pill neutral">미그룹</span>{% endif %}</span>
     </div>
     {% for s in c.signals %}
-    <div class="sig"><b>{{ s[0] }}</b><span class="small d">{{ s[1] }}</span><div class="bar"><i style="width:{{ (s[3]/s[2]*100) if s[2] else 0 }}%"></i></div><span class="mono">{{ s[3] }}/{{ s[2] }}</span></div>
+    <div class="sig"><b>{{ s[0] }}</b><span class="small d">{{ s[1] }}</span><div class="bar"><i style="width:{{ (s[3]/s[2]*100) if s[2] else 0 }}%"></i></div><span class="mono">{{ '일치' if s[3] else '불일치' }}</span></div>
     {% endfor %}
-    {% for u in c.unavailable %}<div class="sig na"><b>{{ u }}</b><span class="small d">데이터 없음 · 수집 예정</span><div class="bar"></div><span class="mono">–</span></div>{% endfor %}
+    {% if c.via %}<p class="small">{{ anchor.agency_id }}와 직접 일치는 {{ m.need }}개 미만이지만 {{ c.via }}와 {{ c.score }}개가 일치해 전이적으로 연결됩니다. 위 근거는 {{ c.via }} 기준입니다.</p>{% endif %}
+    {% if c.decision=='review' %}<p class="small">영업팀이 후보로 넣었지만 일치 항목이 {{ c.score }}개라 기준({{ m.need }}개)에 못 미칩니다. 내부감시팀이 소명 자료를 보고 포함 여부를 정합니다.</p>{% endif %}
     {% if rv and rv.memo %}<p class="small">검토 메모: {{ rv.memo }} ({{ rv.at }})</p>{% endif %}
     {% if st=='MANUAL_REVIEW' and c.decision=='review' and not rv %}
     <form method="post" action="{{ url_for('do_review', rid=r.id) }}" class="row">
@@ -69,12 +70,12 @@
   </div>
   {% endfor %}
   {% if m.controls %}
-  <div class="card dash"><span class="small">대조 · 동명이인 (이름만 같고 점수 {{ RULES.manual_review }} 미만 → 묶지 않음):
-    {% for c in m.controls %}{{ c.name }} {{ c.pair }} {{ c.score }}점{{ ', ' if not loop.last }}{% endfor %}</span></div>
+  <div class="card dash"><span class="small">대조 · 동명이인 (대표자 이름만 같고 일치 {{ m.need }}개 미만 → 묶지 않음):
+    {% for c in m.controls %}{{ c.name }} {{ c.pair }} {{ c.score }}개 일치{{ ', ' if not loop.last }}{% endfor %}</span></div>
   {% endif %}
   {% if st=='MATCHING' and not r.agg %}
   <form method="post" action="{{ url_for('do_eval', rid=r.id) }}" class="row">
-    <button class="btn primary {{ 'mine' if role=='영업팀' }}">그룹 확정 · 실적 합산 및 리스크 검사</button>
+    <button class="btn primary {{ 'mine' if role=='영업팀' }}">그룹 확정 · 합산 한도 및 리스크 검사</button>
     <span class="small">그룹: {{ members|join(', ') }}</span>
   </form>
   {% endif %}
@@ -82,27 +83,30 @@
 
   {% if r.agg %}
   {% set a = r.agg %}
-  {% set scale = [a.total_sales, a.threshold]|max * 1.15 %}
+  {% set scale = [a.amount, a.limit_total]|max * 1.15 %}
   <div class="card">
-    <div class="row between"><h2>실적 합산 · 조건 검증</h2><span class="mono">{{ a.total_sales|man }} / 기준 {{ a.threshold|man }}</span></div>
+    <div class="row between"><h2>관련자 합산 · 지급 한도 검증</h2><span class="mono">합산 {{ a.amount|won }} / 한도 {{ a.limit_total|won }}</span></div>
     <div class="stack">
-      {% for mb in a.members %}<i style="width:{{ mb.sales/scale*100 }}%" title="{{ mb.agency_id }}">{{ mb.agency_id[2:] }} {{ mb.sales|man }}</i>{% endfor %}
-      <span class="th" style="left:{{ a.threshold/scale*100 }}%"><em>기준 {{ a.threshold|man }}</em></span>
+      {% for mb in a.members %}<i style="width:{{ mb.rebate/scale*100 }}%" title="{{ mb.agency_id }}">{{ mb.agency_id[2:] }} {{ mb.rebate|man }}</i>{% endfor %}
+      <span class="th" style="left:{{ a.limit_total/scale*100 }}%"><em>한도 {{ a.limit_total|man }}</em></span>
     </div>
-    <p class="small">대리점별 {{ a.members|map(attribute='sales')|map('man')|join(' · ') }} · 대리점 1곳 월매출 최고치 {{ a.single_max|man }}.
-      {% if a.meets %}합산하면 기준을 {{ (a.total_sales-a.threshold)|man }} 넘습니다.{% else %}합산해도 기준에 {{ (a.threshold-a.total_sales)|man }} 모자랍니다.{% endif %}</p>
+    <p class="small">거래처별 {{ a.members|map(attribute='rebate')|map('man')|join(' · ') }}. 가장 큰 곳도 {{ a.max_single|won }}이라 따로 보면 모두 영업지원팀 전결 범위입니다.
+      {% if a.over_limit %}합산하면 한도를 {{ (a.amount-a.limit_total)|won }} 넘어 <b>영업임원 승인</b>이 필요합니다.{% else %}합산해도 한도 이하라 영업지원팀 전결로 처리합니다.{% endif %}
+      (월 {{ a.limit|won }} · {{ SRC.limit_monthly }}) 전체 장려금 {{ a.file_rows }}건 중 한 건으로 한도를 넘는 것은 {{ a.file_over_single }}건입니다.</p>
     <div class="card ai">
       <span class="ai-tag">AI 계산</span>
       <dl class="kv">
-        <dt>합산 매출</dt><dd class="mono">{{ a.total_sales|won }}</dd>
-        <dt>요청 장려금</dt><dd class="mono"><b>{{ a.amount|won }}</b> · 요율 {{ a.rate|pct }} · {{ a.rebate_ids|join(', ') }}</dd>
+        <dt>합산 장려금</dt><dd class="mono"><b>{{ a.amount|won }}</b> · {{ a.rebate_ids|join(', ') }}</dd>
+        {% if a.monthly|length > 1 %}<dt>월별</dt><dd class="mono">{% for mo in a.monthly %}{{ mo.ym[5:] }}월 {{ mo.amount|won }}{{ ' 초과' if mo.over }}{{ ' · ' if not loop.last }}{% endfor %}</dd>{% endif %}
+        <dt>합산 매출 · 요율</dt><dd class="mono">{{ a.total_sales|won }} · {{ a.rate|pct }}</dd>
         <dt>일반 요율</dt><dd class="mono">{{ a.std_min|pct }}~{{ a.std_max|pct }} (평균 {{ a.std_mean|pct }}, {{ a.std_n }}건)</dd>
         <dt>일반 적용 시</dt><dd class="mono">{{ a.std_amount|won }} (차이 {{ '+' if a.diff>=0 }}{{ a.diff|won }})</dd>
       </dl>
-      <p class="small">우대 요율표가 없어(<span class="tbd">입력 예정</span>) 요율의 정당성은 결재자가 판단합니다.</p>
+      <p class="small">우대 요율을 뒷받침하는 정책 문서가 데이터에 없습니다. 요율 차이는 결재자가 영업팀 소명을 받아 판단합니다.</p>
     </div>
-    {% if a.prior_excess > 0 %}
-    <div class="card hold"><b>사후 검토 자동 등록</b><span class="small">이전 기간 같은 그룹에 {{ a.prior_paid|won }}이 {{ a.prior_approver }} 결재로 지급됐고, 일반 평균 요율 대비 {{ a.prior_excess|won }} 더 나갔습니다. 내부감시팀 검토 목록에 올렸습니다.</span></div>
+    {% if a.prior_over %}
+    <div class="card hold"><b>사후 검토 자동 등록</b><span class="small">이전 {{ a.prior_over|length }}개월 모두 합산하면 한도를 넘는데 {{ a.prior_approver }} 단독 결재로 {{ a.prior_over_amount|won }}이 지급됐습니다
+      ({% for p in a.prior_over %}{{ p.ym[5:] }}월 {{ p.amount|won }}{{ ' · ' if not loop.last }}{% endfor %}). 일반 평균 요율과의 차이는 {{ a.prior_excess|won }}입니다. 내부감시팀 검토 목록에 올렸습니다. 이 서비스는 등록까지만 하며, 환수·재승인 절차는 <b>설계 단계</b>입니다.</span></div>
     {% endif %}
   </div>
   {% endif %}
@@ -121,32 +125,31 @@
       {% for row in c.rows %}<tr><td class="mono">{{ row[0] }}</td><td>{{ row[1] }}</td><td class="num">{{ row[2]|won }}</td><td class="num">{{ row[3] }}일</td></tr>{% endfor %}
     </tbody></table></div>
     {% endfor %}
+    {% for c in r.risk.checks if c.key=='malicious' and c.rows %}
+    <div class="tbl"><table><thead><tr><th>판정</th><th>일자</th><th>대리점 · 유형</th><th>출처</th></tr></thead><tbody>
+      {% for row in c.rows %}<tr><td class="mono">{{ row[0] }}</td><td class="mono">{{ row[1] }}</td><td>{{ row[2] }}</td><td><span class="pill {{ 'warn' if row[3]=='시연용 입력' else 'neutral' }}">{{ row[3] }}</span></td></tr>{% endfor %}
+    </tbody></table></div>
+    {% endfor %}
   </div>
   {% endif %}
 
   {% if st == 'PENDING' or r.resolutions %}
-  {% set od = (r.risk.checks|selectattr('key','equalto','overdue')|list)[0] if r.risk else None %}
   <div class="card {{ 'hold' if st=='PENDING' }}">
     <h2>{{ '⚠ 지급 보류 · 사유 소명 요망' if st=='PENDING' else '보류 처리 이력' }}</h2>
-    {% if st=='PENDING' and 'overdue' in r.risk.hold and od %}
-    <div class="card ai"><span class="ai-tag">AI 상계안</span>
-      <p>장려금 {{ r.agg.amount|won }}을 연체 채권과 상계하면 90일 초과 잔액이 {{ (od.amount - r.agg.amount)|won }}으로 줄어듭니다. (그룹 미회수 합계 {{ od.total_outstanding|won }})</p></div>
-    {% endif %}
     <div class="thread">
       {% for t in threads %}<div class="msg"><b>{{ t.role }}</b> <span class="small mono">{{ t.at }}</span><br>{{ t.body }}</div>{% endfor %}
       {% for k, v in r.resolutions.items() %}<div class="msg"><b>{{ v.by }}</b> <span class="small mono">{{ v.at }}</span><br>보류 해제({{ v.label }}) {{ v.memo }}</div>{% endfor %}
     </div>
     {% if st=='PENDING' %}
     <form method="post" action="{{ url_for('do_explain', rid=r.id) }}" class="card">
-      <label class="small">소명 (영업팀 · 품질팀)<textarea name="body" placeholder="회수 계획 또는 소명 내용"></textarea></label>
+      <label class="small">소명 (영업팀 · 품질팀)<textarea name="body" placeholder="클레임 경위와 재발 방지 계획 등 소명 내용"></textarea></label>
       <div><button class="btn primary {{ 'mine' if role=='영업팀' }}">소명 제출</button></div>
     </form>
-    {% if 'overdue' in r.risk.hold %}
+    {% if 'eligible' in r.risk.hold %}
     <form method="post" action="{{ url_for('do_resolve', rid=r.id) }}" class="row">
-      <input type="hidden" name="key" value="overdue">
+      <input type="hidden" name="key" value="eligible">
       <input name="memo" placeholder="재무팀 메모" style="flex:1;min-width:200px">
-      <button class="btn primary {{ 'mine' if role=='재무팀' }}" name="kind" value="collected">연체 회수 확인 · 해제</button>
-      <button class="btn" name="kind" value="offset">장려금 상계로 해제</button>
+      <button class="btn primary {{ 'mine' if role=='재무팀' }}" name="kind" value="confirmed">장려금 대상 확인 · 해제</button>
     </form>
     {% endif %}
     {% if 'malicious' in r.risk.hold %}
@@ -167,28 +170,55 @@
   {% set c = r.cash %}
   <div class="card">
     <h2>결재</h2>
-    <p><b>관련 거래처 {{ members|length }}곳의 합산 실적이 기준을 넘었습니다{% if r.match.candidates %} (매칭 {% for x in r.match.candidates if x.agency_id in members %}{{ x.agency_id }} {{ x.score }}점{{ ', ' if not loop.last }}{% endfor %}){% endif %}.</b> 장려금 {{ r.agg.amount|won }} ({{ r.agg.rate|pct }}, 일반 대비 {{ '+' if r.agg.diff>=0 }}{{ r.agg.diff|won }}){% if r.settlement=='OFFSET' %} · <span class="pill warn">연체 채권 상계 지급</span>{% endif %}</p>
+    <p><b>동일 관련자 {{ members|length }}곳의 합산 장려금이 월 한도 {{ r.agg.limit_total|won }}을 넘어 영업임원 승인이 필요합니다{% if r.match.candidates %} ({% for x in r.match.candidates if x.agency_id in members %}{{ x.agency_id }} {{ x.score }}/{{ x.max }}개 일치{{ ', ' if not loop.last }}{% endfor %}){% endif %}.</b> 장려금 {{ r.agg.amount|won }} (요율 {{ r.agg.rate|pct }}, 일반 대비 {{ '+' if r.agg.diff>=0 }}{{ r.agg.diff|won }})</p>
+    {% set od = (r.risk.checks|selectattr('key','equalto','overdue')|list)[0] if r.risk else None %}
+    {% if od and od.rows %}
+    <div class="card hold">
+      <b>⚠ 경고 · 이 그룹에 {{ RULES.overdue_days }}일 초과 미회수 채권 {{ od.amount|won }} ({{ od.rows|length }}건)</b>
+      <span class="small">이번 장려금의 {{ '%.1f'|format(od.amount / r.agg.amount) }}배입니다. 그룹 미회수 합계는 {{ od.total_outstanding|won }}입니다. 보류 사유는 아니며, 현금 지급 여부는 결재자가 판단합니다. 참고로 장려금을 연체 채권과 상계하면 {{ RULES.overdue_days }}일 초과 잔액이 {{ (od.amount - r.agg.amount)|won }}으로 줄어듭니다.</span>
+      <div class="tbl"><table><thead><tr><th>채권</th><th>대리점</th><th class="num">미회수</th><th class="num">경과</th></tr></thead><tbody>
+        {% for row in od.rows %}<tr><td class="mono">{{ row[0] }}</td><td>{{ row[1] }}</td><td class="num">{{ row[2]|won }}</td><td class="num">{{ row[3] }}일</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div>
+    {% endif %}
     {% if c %}
     <div class="card dash">
-      <span class="small">참고 · 그룹 현금 ({{ as_of }})</span>
-      <div class="row"><span class="small" style="width:64px">Corevia</span><span class="pill ok">{{ c.cv_close|eok }} · 최근 월 {{ c.cv_month_net|eok }}</span></div>
+      <span class="small">Corevia 자체 현금 근거 ({{ as_of }})</span>
+      <div class="row"><span class="small" style="width:64px">현금</span><span class="pill {{ 'warn' if c.cv_decline_months and c.cv_decline_months >= 2 else 'ok' }}">{{ c.cv_close|eok }}{% if c.cv_decline_months %} · {{ c.cv_decline_months }}개월 연속 감소 {{ c.cv_decline_amount|eok }}{% endif %}</span>
+        {% if c.cv_series %}<span class="small mono">{% for k, v in c.cv_series %}{{ k[5:] }}월 {{ v|eok }}{{ ' → ' if not loop.last }}{% endfor %}</span>{% endif %}</div>
+      {% if c.cv_ar_over %}<div class="row"><span class="small" style="width:64px">채권</span><span class="pill warn">{{ RULES.overdue_days }}일 초과 미회수 {{ c.cv_ar_over|eok }} ({{ c.cv_ar_over_n }}건)</span><span class="small">전체 미회수 {{ c.cv_ar_total|eok }} · 대리점분 {{ c.cv_ar_over_agency|eok }}</span></div>{% endif %}
+      <span class="small">출처: fin_cash_daily_cv · fin_ar_aging_cv</span>
+    </div>
+    <div class="card dash">
+      <span class="small">참고 · 유통 자회사 Masil (대체 지급안을 설계할 때 쓰는 정보이며 거절 근거가 아닙니다)</span>
       <div class="row"><span class="small" style="width:64px">Masil</span><span class="pill {{ 'crit' if c.months_to_breach and c.months_to_breach < 6 else 'warn' }}">{{ c.ms_close|eok }} · 약정 하한 {{ c.covenant|eok }}까지 {{ c.headroom|eok }} · 6개월 평균 {{ c.ms_avg_change|eok }}/월</span>
-        {% if c.breach_date %}<span class="small">→ 추세 유지 시 {{ c.breach_date }} 전후 하한 도달</span>{% endif %}</div>
+        {% if c.breach_date %}<span class="small">→ {{ c.breach_basis }} 기준 {{ c.breach_date }} 하한 하회 예상</span>{% endif %}</div>
+      {% if c.reforecast %}<span class="small">재전망({{ c.reforecast.horizon_days }}일): 채권 회수예정 − 운영 매입채무 − 발주 대금 {{ c.reforecast.po_n }}건 {{ c.reforecast.po_total|eok }}({{ c.reforecast.po_due }} 지급) → 최저 {{ c.reforecast.min_balance|eok }} ({{ c.reforecast.min_date }}). 기한 지난 채권은 회수에서 빼고 신규 매출 유입은 넣지 않은 보수적 계산입니다.</span>{% endif %}
       {% for dch in c.collection_drops %}<span class="small">회수 지연: {{ dch.channel }} {{ dch.name }} ({{ dch.partner }}) 회수율 {{ dch.prior }}% → 최근 4개월 {{ dch.recent }}% · 미회수 {{ dch.shortfall|eok }}</span>{% endfor %}
-      {% if c.board %}<span class="small">이사회: {{ c.board[2] if c.board|length > 2 else c.board[0] }}</span>{% endif %}
+      {% if c.lc_note %}<span class="small">결제 지연 통보(lc0001_payment_term_notice): {{ c.lc_note }}</span>{% endif %}
+      {% if c.covenant_note %}<span class="small">약정 조건(covenant_terms_ms): {{ c.covenant_note }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {% if rec %}
+    <div class="card ai">
+      <span class="ai-tag">AI 권고 · {{ rec.title }}</span>
+      <p>{{ rec.text }}</p>
+      <ul class="small">{% for x in rec.reasons %}<li>{{ x }}</li>{% endfor %}</ul>
+      {% if rec.ask_sales %}<p class="small"><b>영업팀에 확인할 것</b>: {{ rec.ask_sales|join(' / ') }}</p>{% endif %}
+      <p class="small">작성: {{ rec.source }}{% if rec.tools %} · 조회한 데이터 {{ rec.tools|join(', ') }}{% endif %}. AI는 근거와 방향만 제시합니다. 승인·거절은 결재자가 결정합니다.</p>
     </div>
     {% endif %}
     <div class="row"><span class="small">결재선</span>
-      {% for step, who in [(1,'재무팀'),(2,'내부감시팀')] %}
+      {% for who in chain %}
         {% set ap = (approvals|selectattr('role','equalto',who)|list) %}
-        <span class="pill {{ 'ok' if ap and ap[0].decision=='approve' else 'crit' if ap else 'info' if st=='AWAITING_APPROVAL' and next_approver==who else 'neutral' }}">{{ who }} {{ ('승인' if ap[0].decision=='approve' else '거절 ' ~ ap[0].reason) if ap else ('검토 중' if st=='AWAITING_APPROVAL' and next_approver==who else '대기') }}</span>{{ '→' if step==1 }}
+        <span class="pill {{ 'ok' if ap and ap[0].decision=='approve' else 'crit' if ap else 'info' if st=='AWAITING_APPROVAL' and next_approver==who else 'neutral' }}">{{ who }} {{ ('승인' if ap[0].decision=='approve' else '거절 ' ~ ap[0].reason) if ap else ('검토 중' if st=='AWAITING_APPROVAL' and next_approver==who else '대기') }}</span>{{ '→' if not loop.last }}
       {% endfor %}
-      <span class="small">(현행: 영업지원팀 단독)</span>
+      <span class="small">(현행: 영업지원팀 단독 · 정책: 한도 초과 시 영업임원 승인)</span>
     </div>
     {% if st=='AWAITING_APPROVAL' %}
     <div class="grid2">
       <form method="post" action="{{ url_for('do_approve', rid=r.id) }}" class="card">
-        <label class="small">{{ next_approver }} 승인 메모<input name="memo" style="width:100%" value="매칭 근거·합산 실적 확인"></label>
+        <label class="small">{{ next_approver }} 승인 메모<input name="memo" style="width:100%" value="관련자 근거·합산 한도 확인"></label>
         <div><button class="btn primary {{ 'mine' if role==next_approver }}">승인</button></div>
       </form>
       <form method="post" action="{{ url_for('do_reject', rid=r.id) }}" class="card">
@@ -212,14 +242,31 @@
   <div class="card ai">
     <span class="ai-tag">AI 대안 · 거절 사유 CASH_SHORTAGE 감지</span>
     <h2>{{ al.channel.channel_name }}({{ al.channel.channel_id }}) 다음 발주에서 '재고 할인(Credit)'으로 대체 지급</h2>
+    {% if r.ai.alt %}
+    <p>{{ r.ai.alt.proposal }}</p>
+    {% if r.ai.alt.risks %}<p class="small"><b>수락 전에 확인할 것</b>: {{ r.ai.alt.risks|join(' / ') }}</p>{% endif %}
+    <p class="small">작성: Claude · {{ r.ai.alt.model }}</p>
+    {% endif %}
     <dl class="kv">
-      <dt>안</dt><dd>{% if split %}<b>분할안</b> · 크레딧 {{ al.split.credit|won }} + Masil 약정 리스크 해소 후 현금 {{ al.split.cash|won }}{% else %}<b>크레딧 100%</b> · {{ al.credit|won }}{% endif %}</dd>
+      <dt>안</dt><dd>{% if split %}<b>분할안</b> · 크레딧 {{ al.split.credit|won }} + 이 그룹 연체 채권 회수 후 현금 {{ al.split.cash|won }}{% else %}<b>크레딧 100%</b> · {{ al.credit|won }}{% endif %}</dd>
       <dt>적용처</dt><dd>{{ al.channel.channel_name }} · 결제조건 {{ al.channel.payment_terms_days }}일 · 그룹 {{ members|join(', ') }} 발주서</dd>
       <dt>다음 발주</dt><dd>{{ al.next_order or '미정' }} <span class="small">({{ al.next_order_basis }})</span></dd>
       <dt>적용 품목</dt><dd>Corevia SKU {{ al.skus_ok|length }}종 <span class="small">({{ al.skus_ok|join(', ') }})</span>{% if al.skus_excluded %}<br><span class="small">제외 {{ al.skus_excluded|length }}종: {{ al.skus_excluded|join(', ') }} — 확정 결함 lot 품목({{ al.blocked_pl|join(', ') }})</span>{% endif %}</dd>
-      <dt>유효기간</dt><dd class="mono">~{{ al.valid_to }} ({{ RULES.credit_valid_days }}일)</dd>
+      {% if al.exclusion_basis %}
+      <dt>제외 판단 근거</dt><dd class="small">{{ al.exclusion_basis.rule }}.
+        {% for e in al.exclusion_basis.excluded %}{{ e.product_id }}: {{ e.lots|join(', ') }} · 확정 {{ e.claims }}건 · {{ '{:,}'.format(e.qty) }}개. {% endfor %}
+        {{ al.exclusion_basis.discrimination }}. {{ al.exclusion_basis.why_product_level }}.
+        {% if r.ai.alt %}<br>AI 판단: {{ r.ai.alt.exclusion_rationale }}{% endif %} <span class="mono">(감사 로그에 기록)</span></dd>
+      {% endif %}
+      <dt>유효기간</dt><dd class="mono">~{{ al.valid_to }} ({{ RULES.credit_valid_days }}일{% if al.lead_time_weeks_max %} · 리드타임 최장 {{ al.lead_time_weeks_max }}주 포함{% endif %})</dd>
       <dt>Corevia 현금</dt><dd>이번 달 현금 유출 {{ (al.split.cash if split else 0)|won }} (크레딧은 매출 할인 처리)</dd>
-      <dt>Masil 영향</dt><dd class="mono">약정 여유 대비 {{ al.masil_impact_pct }}% <span class="tbd">Corevia↔Masil 정산 방식 입력 예정</span></dd>
+      {% if al.settlement %}
+      <dt>Masil 발주 내역</dt><dd>Corevia 앞 발주 {{ al.settlement.all_n }}건 {{ al.settlement.all_total|won }} <span class="small">(sc_purchase_orders_ms)</span>{% if al.settlement.excluded_n %}<br><span class="small">이 중 확정 결함 품목 발주 {{ al.settlement.excluded_n }}건 {{ al.settlement.excluded_total|won }}({{ al.settlement.excluded_ids }})은 크레딧 대상에서 제외</span>{% endif %}</dd>
+      <dt>Corevia↔Masil 정산</dt><dd>나머지 {{ al.settlement.po_n }}건 {{ al.settlement.po_total|won }}(지급일 {{ al.settlement.due }})에서 크레딧만큼 차감 <span class="small">· 대금의 {{ al.settlement.pct }}% · 양사 합의 필요</span></dd>
+      <dt>Masil 영향</dt><dd>대리점에서 덜 받는 만큼 Corevia에 덜 내므로 현금 중립 <span class="small">(차감이 없으면 약정 여유 대비 {{ al.masil_impact_pct }}% 유출)</span></dd>
+      {% else %}
+      <dt>Masil 영향</dt><dd class="mono">약정 여유 대비 {{ al.masil_impact_pct }}% <span class="small">· 발주(PO) 파일이 없어 정산 대상 미지정</span></dd>
+      {% endif %}
     </dl>
     <div class="row">
       <span class="pill {{ 'ok' if '영업팀' in r.alt_accept else 'neutral' }}">영업팀 {{ '수락' if '영업팀' in r.alt_accept else '대기' }}</span>
@@ -254,13 +301,13 @@
 
   {% if st=='PAID' %}
   <div class="card okb">
-    <h2>{{ r.agg.amount|won }} {{ '연체 채권 상계 처리' if r.settlement=='OFFSET' else '현금 지급 처리' }}</h2>
+    <h2>{{ r.agg.amount|won }} 현금 지급 처리</h2>
     <div class="tbl"><table><thead><tr><th>장려금 ID</th><th>대리점</th><th class="num">금액</th><th>계좌</th></tr></thead><tbody>
       {% for mb in r.agg.members %}<tr><td class="mono">{{ mb.rebate_ids|join(', ') }}</td><td>{{ mb.agency_id }} {{ mb.agency_name }}</td><td class="num">{{ mb.rebate|won }}</td><td class="mono small">{{ mb.account }}</td></tr>{% endfor %}
     </tbody></table></div>
   </div>
   {% endif %}
-  {% if st=='NOT_ELIGIBLE' %}<div class="card crit"><b>합산 실적 기준 미달로 종결</b></div>{% endif %}
+  {% if st=='WITHIN_LIMIT' %}<div class="card"><b>합산 한도 이하 · 영업지원팀 전결 범위</b><span class="small">관련자를 합산해도 월 한도 이하라 임원 승인 대상이 아닙니다. 기존 영업지원팀 승인 절차로 처리합니다.</span></div>{% endif %}
   {% if st=='CLOSED' %}<div class="card"><b>종결</b><span class="small">감사 로그에서 사유를 확인하세요.</span></div>{% endif %}
 </div>
 

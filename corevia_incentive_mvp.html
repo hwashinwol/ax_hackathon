@@ -169,10 +169,10 @@ tr:last-child td{border-bottom:0}
 <div class="wrap">
 
 <header class="narrow" style="display:flex;flex-direction:column;gap:12px">
-  <span class="eyebrow">Aurora Group · Corevia Cosmetics · MVP 기획 v0.2 (데이터 반영)</span>
+  <span class="eyebrow">Aurora Group · Corevia Cosmetics · MVP 기획 v0.4 (서비스 개발 현황 반영)</span>
   <h1>관련 거래처 판매장려금 결재 시스템</h1>
-  <p class="lead">영업팀은 대표자가 같은 대리점 여러 곳을 하나의 관련 거래처 그룹으로 보고 합산 실적 기준 우대 장려금을 요청하고, 재무·내부감시팀은 사업자번호가 서로 달라 배임 리스크를 이유로 지급을 막습니다. 이 시스템에서는 AI가 동일 지배구조 근거를 점수로 보여 주고, 합산 실적·채권 연체·품질·그룹 현금 사정을 차례로 확인한 뒤 결재와 대안 제시까지 하나의 화면 흐름으로 처리합니다.</p>
-  <p class="small">화면의 거래처·금액·점수는 <span class="mono">hackathon_data</span> 폴더의 실제 파일(데이터 기준일 <b class="mono">2026-06-30</b>)에서 가져왔습니다. 데이터에 없는 기준값(합산 기준선, 우대 요율표, 신호 가중치 등)은 <span class="tbd">입력 예정</span>으로 표시했고, 화면에는 예시값을 넣었습니다. 아직 개발 단계가 아니므로 모든 화면은 와이어프레임입니다.</p>
+  <p class="lead">Corevia는 거래처별 월 장려금이 200만 원 이하면 영업지원팀이 전결하고, 넘으면 영업임원 승인을 받습니다. 동일 관련자는 합산해 한도를 적용해야 하는데, 지금은 거래처 단위로만 심사합니다. 그 결과 대표자가 같은 대리점 3곳의 장려금이 매달 한도의 약 2배인데도 임원 승인 없이 나갔습니다. 이 시스템에서는 AI가 대표자·주소·정산계좌의 일치 근거로 동일 관련자를 묶어 합산 한도를 확인하고, 악성 클레임·채권 연체·현금 사정을 차례로 본 뒤 결재와 대안 제시까지 하나의 화면 흐름으로 처리합니다.</p>
+  <p class="small">화면의 거래처·금액은 <span class="mono">hackathon_data</span> 폴더의 실제 파일(데이터 기준일 <b class="mono">2026-06-30</b>)에서 가져왔습니다. 동일 관련자 판정 기준과 지급 한도는 <span class="mono">data_dictionary</span>·<span class="mono">approval_authority_policy</span>를 따릅니다. 정책 문서에 근거가 없어 이 기획에서 정한 값(연체 기준일수, 크레딧 비율·유효기간)은 <span class="tbd">자체 설정</span>으로 표시했습니다. 등록 정보가 겹치는 것은 소명·감사 대상이며 부정 확정이 아닙니다.</p>
 </header>
 
 <section>
@@ -181,15 +181,34 @@ tr:last-child td{border-bottom:0}
     <h2>기본 4단계와 두 개의 분기</h2>
   </div>
   <div class="flow">
-    <div><span class="k">① 확인</span><h3>AI 거래처 매칭</h3><p>대리점 마스터의 대표자명·사업장 주소·정산계좌에 실제 입금 계좌(수금 이력)까지 비교해 동일 지배구조 점수를 계산하고 근거를 함께 보여줍니다.</p></div>
-    <div><span class="k">② 판단</span><h3>실적 합산·조건 검증</h3><p>그룹 월매출을 합산해 기준선 충족 여부를 확인하고, 요청 요율이 일반 대리점 요율 범위(10.0~14.0%)를 넘는지 비교합니다.</p></div>
-    <div><span class="k">③ 승인 요청</span><h3>재무·내부감시 결재</h3><p>현재는 영업지원팀 혼자 결재합니다. 앞으로는 매칭 근거·합산 실적·리스크 결과를 담은 결재 팝업을 재무팀과 내부감시팀에 차례로 보냅니다.</p></div>
+    <div><span class="k">① 확인</span><h3>AI 거래처 매칭</h3><p>대리점 마스터의 대표자명·사업장 주소·정산계좌에 실제 입금 계좌(수금 이력)까지 비교해, 3개 중 2개 이상 일치하는 거래처를 동일 관련자로 묶고(전이 연결) 항목별 근거를 함께 보여줍니다.</p></div>
+    <div><span class="k">② 판단</span><h3>합산 한도 검증</h3><p>그룹의 월 장려금을 합산해 한도 200만 원을 넘는지 확인하고, 요청 요율이 일반 대리점 요율 범위(10.0~14.0%)를 넘는지 비교합니다.</p></div>
+    <div><span class="k">③ 승인 요청</span><h3>재무·내부감시·임원 결재</h3><p>현재는 영업지원팀 혼자 결재합니다. 앞으로는 관련자 근거·합산 금액·리스크 결과를 담은 결재 팝업을 재무팀, 내부감시팀, 영업임원에게 차례로 보냅니다. 한도를 넘는 건의 영업임원 승인은 정책상 필수입니다.</p></div>
     <div><span class="k">④ 처리</span><h3>지급 / 상태 변경</h3><p>승인되면 현금으로 지급하고, 거절되면 사유에 맞는 대안 절차로 넘깁니다. 이사회 지침에 따라 모든 판단 근거를 감사 로그에 남깁니다.</p></div>
   </div>
   <div class="branches">
-    <div class="branch"><span class="pill warn">분기 A · 나만의 확장</span><h3>리스크 거래처 자동 보류</h3><p>실적 기준을 넘겨도 그룹 안에 <b>90일 넘게 연체된 채권</b>이 있으면 결재로 넘기지 않고 <b>보류(Pending)</b> 처리합니다. 영업팀과 재무팀(채권 담당)에 소명 요청 알림을 보내고, AI는 장려금을 연체 채권과 상계하는 안을 제안합니다. 품질팀의 '악의적 클레임 3회 이상' 기준도 같은 보류 규칙에 들어가지만, 지금 데이터에는 판정 필드가 없어 <span class="tbd">데이터 확보 후</span> 켭니다.</p></div>
-    <div class="branch"><span class="pill info">분기 B · 다른 부서 영향</span><h3>현금 거절 시 Masil 재고 할인 대체</h3><p>Masil 현금이 대출 약정(covenant) 하한 30억 원에 다가가자 재무팀이 그룹 유동성 방어를 이유로 현금 지급을 거절하면, AI가 같은 금액을 Masil 대리점 정산채널(CH-04)의 다음 발주에 <b>재고 할인(Credit)</b>으로 반영하는 안을 제안합니다. 이 안이 Masil의 약정 여유분에 주는 영향도 함께 계산해 보여줍니다.</p></div>
+    <div class="branch"><span class="pill warn">분기 A · 나만의 확장</span><h3>악성 클레임 거래처 자동 보류</h3><p>합산 한도를 넘어 결재 대상이 된 건이라도, 그룹 안 거래처에 품질팀의 <b>'악의적' 클레임 판정이 최근 6개월 3건 이상</b>이면 결재로 넘기지 않고 <b>보류(Pending)</b>합니다. 영업팀과 품질팀에 소명 요청 알림을 보내고, 영업팀 소명 뒤 품질팀이 해제해야 결재가 재개됩니다. 원천 qc_claims_cv에는 판정 필드가 없어 품질팀이 '품질 판정' 화면에서 등록합니다. 90일 넘게 연체된 채권은 보류 사유가 아니라 결재 화면의 경고로 보여 줍니다.</p></div>
+    <div class="branch"><span class="pill info">분기 B · 다른 부서 영향</span><h3>현금 거절 시 Masil 재고 할인 대체</h3><p>Corevia 현금이 3개월 연속 줄고(218.5억 → 190.8억 원) 이 그룹에서 받을 90일 초과 채권 2,920만 원이 밀려 있어 재무팀이 현금 지급을 거절하면, AI가 같은 금액을 Masil 대리점 정산채널(CH-04)의 다음 발주에 <b>재고 할인(Credit)</b>으로 반영하는 안을 제안합니다. Masil이 Corevia에 낼 발주 대금에서 같은 금액을 차감해 Masil 현금에는 영향이 없게 합니다.</p></div>
   </div>
+</section>
+
+<section>
+  <div class="sec-head narrow">
+    <span class="eyebrow">1-2 · 운영 중 AI</span>
+    <h2>AI 에이전트(Claude)가 하는 일</h2>
+    <p class="lead">숫자 계산과 상태 전이는 정책 규칙이 정하고, Claude는 도구로 원천 데이터를 직접 조회해 근거를 종합하고 사람에게 줄 판단 자료를 씁니다. 승인·거절·해제는 사람이 합니다. 에이전트가 부른 도구와 출력은 모두 감사 로그에 남고, API가 연결되지 않으면 규칙 기반 문구로 대신합니다.</p>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>호출 시점</th><th>에이전트가 하는 일</th><th>결과가 쓰이는 곳</th><th>결정하는 사람</th></tr></thead>
+      <tbody>
+        <tr><td>결재 대기 진입</td><td>관련자 판정 · 합산 한도 · 리스크 · Corevia 현금 근거를 조회해 권고안과 영업팀에 물을 질문을 작성</td><td>결재 화면의 AI 권고 카드</td><td>재무팀 · 내부감시팀 · 영업임원</td></tr>
+        <tr><td>영업팀 소명 제출</td><td>보류 사유와 소명 스레드를 읽고 소명이 충분한지, 더 받아야 할 증빙이 무엇인지 평가</td><td>소명 스레드의 AI 소명 검토</td><td>품질팀</td></tr>
+        <tr><td>현금 지급 거절 (CASH_SHORTAGE)</td><td>크레딧 대체안 계산값과 품질·발주 데이터를 조회해 안을 설명하고 품목 제외 판단 근거를 작성</td><td>대안 제안 카드 · 감사 로그</td><td>영업팀 · 재무팀</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small">에이전트 도구 10개: 요청 정보 · 관련자 판정 · 합산 한도 · 리스크 검사 · Corevia 현금 근거 · Masil 현황 · 크레딧 대체안 · 소명 스레드 · 문서 목록 · 문서 읽기. 모델 <span class="mono">claude-opus-5-5</span> · 출력은 JSON 스키마로 고정.</p>
 </section>
 
 <section>
@@ -201,11 +220,12 @@ tr:last-child td{border-bottom:0}
   <div class="facts">
     <div class="fact"><span class="pill info" style="align-self:flex-start">관련 거래처</span><span class="num">3개 사업자 · 대표 박상현</span><p>D-011 금강상사11과 D-024 성일상사24는 사업장 주소(성남시 상공로 128)가 같고, D-011과 D-037 대륙상사37은 정산계좌(국민 412-27-556310)가 같습니다. D-024의 미수금 2건도 D-011 계좌에서 입금됐습니다.</p><span class="src">m_agency_cv · fin_collection_history_cv (DP-00006·13·14·20)</span></div>
     <div class="fact"><span class="pill neutral" style="align-self:flex-start">동명이인 대조군</span><span class="num">박준호 2곳 → 미그룹</span><p>D-034와 D-041은 대표자 이름만 같고 주소(대전/고양)와 계좌가 다릅니다. 이름만으로 그룹을 묶지 않는다는 점을 보여주는 대조 사례입니다.</p><span class="src">m_agency_cv</span></div>
-    <div class="fact"><span class="pill warn" style="align-self:flex-start">우대 요율 이상치</span><span class="num">16.7% vs 일반 12.1%</span><p>박상현 그룹 3곳의 장려금 요율은 15.6~17.4%이고, 나머지 대리점 222건은 10.0~14.0%입니다. 1~5월 지급분 22,238,349원 가운데 일반 평균보다 많이 나간 금액은 5,987,976원입니다.</p><span class="src">sales_rebate_payment_cv (240건 · 결재자 영업지원팀 단독)</span></div>
-    <div class="fact"><span class="pill info" style="align-self:flex-start">합산해야 기준 충족</span><span class="num">6월 합산 2,332만 원</span><p>그룹의 6월 매출은 D-011 820.5만 + D-024 689.0만 + D-037 822.9만 원입니다. 대리점 1곳의 월매출 최고치는 1,367만 원(D-009)이라 단독으로는 어느 곳도 기준에 못 미칩니다.</p><span class="src">sales_rebate_payment_cv · 2026-06 미지급 40건</span></div>
-    <div class="fact"><span class="pill crit" style="align-self:flex-start">채권 연체</span><span class="num">90일 초과 29,202,840원</span><p>그룹의 미회수 채권은 9건 48,481,080원이고, 이 가운데 5건이 90일을 넘겼습니다(가장 오래된 건은 AR-D00125, 176일). 6월 장려금(3,888,097원)의 7.5배입니다.</p><span class="src">fin_ar_aging_cv</span></div>
-    <div class="fact"><span class="pill crit" style="align-self:flex-start">그룹 현금</span><span class="num">Masil 약정 여유 21.5억 원</span><p>Masil 현금은 1월 초 93.6억 원에서 6월 말 51.5억 원으로 줄었습니다(월평균 −7.0억 원). 이 추세가 이어지면 2026년 10월 초 약정 하한 30억 원에 닿습니다. 뷰티메가마트(CH-03) 회수율이 3월부터 62~68%로 떨어진 것이 주된 원인입니다. 같은 기간 Corevia 현금은 190.8억 원으로 안정적입니다.</p><span class="src">fin_cash_daily_ms · fin_collection_history_ms · fin_ar_aging_ms · fin_cash_daily_cv</span></div>
-    <div class="fact"><span class="pill warn" style="align-self:flex-start">품질</span><span class="num">LOT-B-2602-P 확정 45건</span><p>PL-02 더마 라인(리페어 세럼 외 3종)에서 피부트러블 결함이 확정됐습니다(36,522개). 다만 클레임 165건은 모두 C-고객 단위라 대리점과 직접 연결되지 않습니다. 언론 보도는 미확정 단계이고 제품도 특정되지 않아 보류 근거로 쓰지 않습니다.</p><span class="src">qc_claims_cv · m_sku_ms · ext_news_quality_incident</span></div>
+    <div class="fact"><span class="pill warn" style="align-self:flex-start">우대 요율 이상치</span><span class="num">16.7% vs 일반 12.1%</span><p>박상현 그룹 3곳의 장려금 요율은 15.6~17.4%이고, 나머지 대리점 222건은 10.0~14.0%입니다. 1~5월 지급분 22,238,349원 가운데 일반 평균보다 많이 나간 금액은 5,987,976원입니다. 일반 222건은 매출 규모와 요율이 무관해(상관 −0.01) 물량 구간별 요율 체계는 보이지 않습니다.</p><span class="src">sales_rebate_payment_cv (240건 · 결재자 영업지원팀 단독)</span></div>
+    <div class="fact"><span class="pill crit" style="align-self:flex-start">합산하면 한도 초과</span><span class="num">6월 합산 388.8만 원 · 한도 200만</span><p>그룹의 6월 장려금은 D-011 137.4만 + D-024 118.9만 + D-037 132.6만 원입니다. 따로 보면 모두 200만 원 이하라 영업지원팀 전결 범위이고, 240건 가운데 한 건으로 한도를 넘는 장려금은 없습니다(최대 186.7만 원). 합산하면 1~6월 내내 한도를 넘습니다(388.8만~487.0만 원).</p><span class="src">sales_rebate_payment_cv · approval_authority_policy</span></div>
+    <div class="fact"><span class="pill crit" style="align-self:flex-start">채권 연체</span><span class="num">90일 초과 29,202,840원</span><p>그룹의 미회수 채권은 9건 48,481,080원이고, 이 가운데 5건이 90일을 넘겼습니다(가장 오래된 건은 AR-D00125, 176일). 6월 장려금(3,888,097원)의 7.5배입니다. 보류 사유로 쓰지 않고 결재 화면에 경고로 보여 줍니다.</p><span class="src">fin_ar_aging_cv</span></div>
+    <div class="fact"><span class="pill crit" style="align-self:flex-start">Corevia 현금</span><span class="num">190.8억 원 · 3개월 연속 감소</span><p>Corevia 월말 현금은 3월 218.5억 원에서 6월 190.8억 원으로 3개월 연속 줄었습니다(−27.7억 원). 90일 넘게 못 받은 채권은 62.8억 원(38건)이고, 그중 대리점분이 1.5억 원입니다. 시나리오 ③에서 재무팀이 현금 지급을 거절하는 근거입니다.</p><span class="src">fin_cash_daily_cv · fin_ar_aging_cv</span></div>
+    <div class="fact"><span class="pill neutral" style="align-self:flex-start">Masil · 대안 설계 참고</span><span class="num">07-21 약정 하한 하회 재전망</span><p>Masil 현금은 51.5억 원이고, 7월 21일에 Corevia 앞 발주 대금 37.5억 원이 나가 약정 하한 30억 원을 밑돌 것으로 재전망됩니다(최저 14.7억 원). 뷰티메가마트(CH-03)가 결제조건을 45일에서 90일로 늘린 영향입니다. 거절 근거로 쓰지 않고, 크레딧 대안이 Masil 현금에 부담을 주지 않게 설계하는 데 씁니다.</p><span class="src">fin_cash_daily_ms · fin_ar_aging_ms · fin_ap_aging_ms · sc_purchase_orders_ms · lc0001_payment_term_notice</span></div>
+    <div class="fact"><span class="pill warn" style="align-self:flex-start">품질</span><span class="num">LOT-B-2602-P 확정 45건</span><p>PL-02 더마 라인(리페어 세럼 외 3종)에서 피부트러블 결함이 확정됐습니다(36,522개). 다만 클레임 165건은 모두 C-고객 단위라 대리점과 직접 연결되지 않습니다. 언론 보도는 미확정 단계이고 제품도 특정되지 않아 보류 근거로 쓰지 않습니다. 미종결 확정 결함은 6개 제품군 중 PL-02에만 있어, 크레딧 대상에서 더마 4종만 뺍니다.</p><span class="src">qc_claims_cv · m_sku_ms · ext_news_quality_incident</span></div>
     <div class="fact"><span class="pill neutral" style="align-self:flex-start">이사회 지침</span><span class="num">약정 위반 = 기한이익상실</span><p>날짜가 정해진 방어 수요를 먼저 확보하고, 전액·분할 배분을 모두 허용하며, 결정 근거는 기록으로 남깁니다. 이 지침이 거절 사유 코드, 분할 대안, 감사 로그의 근거가 됩니다.</p><span class="src">board_minutes</span></div>
     <div class="fact"><span class="pill ok" style="align-self:flex-start">판촉 중복 없음</span><span class="num">대리점 채널 캠페인 0건</span><p>Masil 인플루언서 캠페인 25건(인플루언서 10명)은 마켓플레이스·자사몰·대형파트너·라이브 채널에서만 진행됐습니다. 따라서 장려금과 판촉비가 이중으로 나간 정황은 없습니다.</p><span class="src">m_campaign_ms · m_influencer_ms · m_channel_ms</span></div>
   </div>
@@ -219,7 +239,7 @@ tr:last-child td{border-bottom:0}
   </div>
   <div class="scn-tabs" role="tablist" id="scnTabs">
     <button role="tab" id="tab-1" data-s="1" aria-selected="true">① 정상 작동</button>
-    <button role="tab" id="tab-2" data-s="2" aria-selected="false">② 연체 채권 보류</button>
+    <button role="tab" id="tab-2" data-s="2" aria-selected="false">② 악성 클레임 보류</button>
     <button role="tab" id="tab-3" data-s="3" aria-selected="false">③ 현금 거절 → 대체 지급</button>
   </div>
   <div class="player">
@@ -259,7 +279,7 @@ stateDiagram-v2
   state "요청 접수<br/>REQUESTED" as REQ
   state "매칭 검토<br/>MATCHING" as MAT
   state "수동 검토<br/>MANUAL_REVIEW" as MAN
-  state "기준 미달<br/>NOT_ELIGIBLE" as NE
+  state "전결 범위<br/>WITHIN_LIMIT" as NE
   state "리스크 검사<br/>RISK_CHECK" as RISK
   state "보류<br/>PENDING" as PEN
   state "결재 대기<br/>AWAITING_APPROVAL" as AWA
@@ -271,15 +291,15 @@ stateDiagram-v2
   state "종결<br/>CLOSED" as CLO
   [*] --> REQ
   REQ --> MAT: AI 매칭 실행
-  MAT --> MAN: 점수 70~89
+  MAT --> MAN: 영업 입력 후보가 1개만 일치
   MAN --> MAT: 내부감시 확정
-  MAT --> NE: 합산 실적 미달
-  MAT --> RISK: 그룹 확정 및 실적 충족
-  RISK --> PEN: 90일+ 연체 / 악성 클레임
-  PEN --> RISK: 회수·상계 확인 / 품질 해제
+  MAT --> NE: 합산 한도 이하
+  MAT --> RISK: 합산 한도 초과
+  RISK --> PEN: 악의적 클레임 판정 3건 이상
+  PEN --> RISK: 영업 소명 후 품질팀 해제
   PEN --> CLO: 소명 기각
-  RISK --> AWA: 리스크 없음
-  AWA --> PAID: 재무+내부감시 승인
+  RISK --> AWA: 보류 사유 없음 (연체는 경고)
+  AWA --> PAID: 재무+내부감시+영업임원 승인
   AWA --> REJ: 거절
   REJ --> ALT: 사유 = 현금 부족
   REJ --> CLO: 기타 사유
@@ -297,12 +317,13 @@ stateDiagram-v2
       <thead><tr><th>상태</th><th>진입 조건</th><th>담당</th><th>알림</th></tr></thead>
       <tbody>
         <tr><td><span class="pill neutral">REQUESTED</span></td><td>영업팀이 기준 거래처(예: D-011)와 정산월을 골라 요청을 만듦</td><td>영업</td><td>없음</td></tr>
-        <tr><td><span class="pill info">MATCHING</span></td><td>AI 매칭과 실적 합산 계산 (자동)</td><td>시스템</td><td>없음</td></tr>
-        <tr><td><span class="pill warn">MANUAL_REVIEW</span></td><td>매칭 점수가 애매한 구간 <span class="tbd">70~89 입력 예정</span> · 예: D-037 76점</td><td>내부감시</td><td>내부감시팀</td></tr>
-        <tr><td><span class="pill warn">PENDING</span></td><td>그룹 내 거래처 중 한 곳이라도 90일 초과 연체 채권 보유, 또는 악성 클레임 기준 초과(데이터 확보 후)</td><td>재무(채권) · 품질 · 영업</td><td>영업팀 · 재무팀 경고</td></tr>
-        <tr><td><span class="pill info">AWAITING_APPROVAL</span></td><td>매칭·실적·리스크 검사 모두 통과 (원천 상태 '미지급')</td><td>재무 → 내부감시</td><td>결재 팝업</td></tr>
-        <tr><td><span class="pill ok">PAID</span></td><td>두 결재 모두 승인하고 지급 처리 완료 (원천 상태 '승인' · 지급일 익월 4~9일)</td><td>재무</td><td>영업팀</td></tr>
-        <tr><td><span class="pill crit">REJECTED</span></td><td>결재자 중 1명이라도 거절 (사유 코드 필수 · 원천 상태 '반려')</td><td>재무 / 내부감시</td><td>영업팀</td></tr>
+        <tr><td><span class="pill info">MATCHING</span></td><td>동일 관련자 판정과 장려금 합산 (자동)</td><td>시스템</td><td>없음</td></tr>
+        <tr><td><span class="pill neutral">WITHIN_LIMIT</span></td><td>관련자를 합산해도 월 200만 원 이하 → 기존 영업지원팀 전결로 처리</td><td>영업지원</td><td>영업팀</td></tr>
+        <tr><td><span class="pill warn">MANUAL_REVIEW</span></td><td>영업팀이 후보로 넣었지만 식별정보가 1개만 일치 · 예: 박준호 D-034 ↔ D-041 (대표자만 같음)</td><td>내부감시</td><td>내부감시팀</td></tr>
+        <tr><td><span class="pill warn">PENDING</span></td><td>그룹 내 거래처에 최근 6개월 '악의적' 클레임 판정 3건 이상 (품질팀 등록)</td><td>품질 · 영업</td><td>영업팀 · 품질팀 경고</td></tr>
+        <tr><td><span class="pill info">AWAITING_APPROVAL</span></td><td>합산 한도 초과 + 보류 사유 없음 (원천 상태 '미지급') · 연체는 경고로 표시 · AI 권고 작성</td><td>재무 → 내부감시 → 영업임원</td><td>결재 팝업</td></tr>
+        <tr><td><span class="pill ok">PAID</span></td><td>세 결재 모두 승인하고 지급 처리 완료 (원천 상태 '승인' · 지급일 익월 4~9일)</td><td>재무</td><td>영업팀</td></tr>
+        <tr><td><span class="pill crit">REJECTED</span></td><td>결재자 중 1명이라도 거절 (사유 코드 필수 · 원천 상태 '반려')</td><td>재무 / 내부감시 / 영업임원</td><td>영업팀</td></tr>
         <tr><td><span class="pill info">ALT_PROPOSED</span></td><td>거절 사유가 <span class="mono">CASH_SHORTAGE</span>일 때</td><td>시스템 제안 → 영업·재무 수락</td><td>영업 · 재무</td></tr>
         <tr><td><span class="pill info">CREDIT_SCHEDULED</span></td><td>양측이 수락하면 Masil CH-04 다음 발주에서 차감하도록 예약</td><td>Masil 연동</td><td>Masil 담당자</td></tr>
         <tr><td><span class="pill ok">CREDIT_SETTLED</span></td><td>Masil 발주서에 할인 반영을 확인</td><td>시스템</td><td>영업 · 재무</td></tr>
@@ -314,17 +335,18 @@ stateDiagram-v2
 <section>
   <div class="sec-head narrow">
     <span class="eyebrow">5 · 화면 목록</span>
-    <h2>MVP에 필요한 화면 8개</h2>
+    <h2>MVP 화면 9개</h2>
   </div>
   <div class="screens">
-    <div class="scard"><span class="id">S0 · 데이터 연결</span><h3>데이터 업로드</h3><p>hackathon_data의 파일 17개를 넣고 컬럼 매핑 결과를 확인하는 화면입니다.</p><ul><li>Corevia: 대리점 마스터 · 장려금 · 채권 · 수금 · 현금 · 품질 클레임</li><li>Masil: 채널 · SKU · 현금(약정 포함) · 채권 · 회수율 · 캠페인 · 인플루언서</li><li>문서: 이사회 회의록 · 외부 품질 보도</li><li>구분자 <span class="mono">|</span> · UTF-8 검증 결과</li></ul></div>
+    <div class="scard"><span class="id">S0 · 데이터 연결</span><h3>데이터 업로드</h3><p>hackathon_data의 파일 20종을 넣고 컬럼 매핑 결과를 확인하는 화면입니다.</p><ul><li>정책: 지급 한도 · 동일 관련자 정의 · 약정 조건</li><li>Corevia: 대리점 마스터 · 장려금 · 채권 · 수금 · 현금 · 품질 클레임</li><li>Masil: 채널 · SKU · 현금(약정 포함) · 채권 · 매입채무 · 발주 · 회수율 · 캠페인 · 인플루언서</li><li>문서: 이사회 회의록 · 외부 품질 보도</li><li>구분자 <span class="mono">|</span> · UTF-8 검증 결과</li></ul></div>
     <div class="scard"><span class="id">S1 · 요청함</span><h3>장려금 요청 목록</h3><p>역할별로 내가 처리할 건을 상태별로 걸러서 보여줍니다.</p><ul><li>2026-06 미지급 40건 · 승인 196 · 반려 4</li><li>상태 필터 · 요청금액 · 경과일</li><li>새 요청 버튼(영업)</li></ul></div>
     <div class="scard"><span class="id">S2 · 새 요청</span><h3>요청 작성</h3><p>영업팀이 기준 거래처와 정산월을 고르고 매칭을 실행합니다.</p><ul><li>대리점 검색(D-001~D-050)</li><li>관련 거래처 후보 직접 추가</li><li>요청 사유 메모</li></ul></div>
-    <div class="scard"><span class="id">S3 · 매칭 결과</span><h3>관련 거래처 그룹</h3><p>거래처별 매칭 점수와 신호별 근거를 보여줍니다. 내부감시팀은 이 근거를 보고 직접 판단합니다.</p><ul><li>신호별 점수 막대(데이터 없는 신호는 점선)</li><li>동명이인 대조 결과</li><li>그룹 확정 / 제외 · 수동 검토</li></ul></div>
-    <div class="scard"><span class="id">S4 · 실적 검증</span><h3>합산 실적과 기준선</h3><p>거래처별 매출을 쌓은 막대와 기준선을 보여주고, 요청 요율을 일반 요율과 비교합니다.</p><ul><li>개별 vs 합산 · 단일 최고치 대비</li><li>일반 평균 요율 적용 시 차액</li><li>과거 초과 지급분 사후 검토 등록</li></ul></div>
-    <div class="scard"><span class="id">S5 · 결재</span><h3>승인 팝업</h3><p>재무팀 → 내부감시팀 순서로 결재합니다. 거절할 때는 사유 코드를 꼭 골라야 합니다.</p><ul><li>요약 카드(점수 · 실적 · 금액 · 요율 차)</li><li>Corevia 현금 · Masil 약정 여유</li><li>승인 / 거절 + 사유 선택</li></ul></div>
-    <div class="scard"><span class="id">S6 · 보류·대안</span><h3>예외 처리</h3><p>연체 보류 경고와 소명 스레드, 현금 거절 시 대체 지급 제안을 다룹니다.</p><ul><li>연체 채권 표 · 상계안 · 소명 제출</li><li>크레딧 카드(적용 SKU · Masil 영향)</li><li>분할안 · 영업·재무 각각 수락</li></ul></div>
-    <div class="scard"><span class="id">S7 · 감사 로그</span><h3>판단 이력</h3><p>매칭 근거, 계산값, 결재자, 시각을 수정할 수 없는 기록으로 남깁니다(이사회 지침: 결정 근거 기록).</p><ul><li>요청 건별 타임라인</li><li>사후 검토 대상(1~5월 초과분)</li><li>CSV 내보내기(내부 감사용)</li></ul></div>
+    <div class="scard"><span class="id">S3 · 매칭 결과</span><h3>관련 거래처 그룹</h3><p>거래처별로 대표자·주소·정산계좌의 일치 여부와 근거를 보여줍니다. 2개 이상 일치하면 동일 관련자입니다.</p><ul><li>식별정보 3개 일치 여부 · 실제 입금 계좌 대조</li><li>동명이인 대조 결과</li><li>그룹 확정 / 제외 · 수동 검토</li></ul></div>
+    <div class="scard"><span class="id">S4 · 실적 검증</span><h3>합산 장려금과 한도</h3><p>거래처별 장려금을 쌓은 막대와 월 한도 200만 원을 보여주고, 요청 요율을 일반 요율과 비교합니다.</p><ul><li>개별 vs 합산 · 단일 최고치 대비</li><li>일반 평균 요율 적용 시 차액</li><li>과거 한도 초과 지급분 사후 검토 등록</li></ul></div>
+    <div class="scard"><span class="id">S5 · 결재</span><h3>승인 팝업</h3><p>재무팀 → 내부감시팀 → 영업임원 순서로 결재합니다. 거절할 때는 사유 코드를 꼭 골라야 합니다.</p><ul><li>요약 카드(일치 항목 · 합산 금액 · 한도 · 요율 차)</li><li>AI 권고 카드 · 연체 경고</li><li>Corevia 자체 현금 근거 · Masil 참고</li><li>승인 / 거절 + 사유 선택</li></ul></div>
+    <div class="scard"><span class="id">S6 · 보류·대안</span><h3>예외 처리</h3><p>악성 클레임 보류와 소명 스레드(AI 소명 검토 포함), 현금 거절 시 대체 지급 제안을 다룹니다.</p><ul><li>판정 내역 · 소명 제출 · 품질팀 해제</li><li>크레딧 카드(적용 SKU · 제외 판단 근거 · Masil 영향)</li><li>분할안 · 영업·재무 각각 수락</li></ul></div>
+    <div class="scard"><span class="id">S7 · 감사 로그</span><h3>판단 이력</h3><p>매칭 근거, 계산값, 결재자, 시각을 수정할 수 없는 기록으로 남깁니다(이사회 지침: 결정 근거 기록).</p><ul><li>요청 건별 타임라인</li><li>사후 검토 대상(1~5월 초과분) · 환수·재승인은 설계 단계</li><li>AI 에이전트 실행 내역(도구 호출 · 출력)</li><li>CSV 내보내기(내부 감사용)</li></ul></div>
+    <div class="scard"><span class="id">S8 · 품질 판정</span><h3>클레임 판정 등록</h3><p>품질팀이 대리점별 '악의적' 클레임 판정을 등록합니다. 원천 파일에 판정 필드가 없어 시스템에서 받습니다.</p><ul><li>대리점 · 일자 · 유형 · 근거</li><li>등록 내역과 출처(품질팀 입력 / 시연용 입력)</li><li>최근 6개월 3건 이상이면 보류</li></ul></div>
   </div>
 </section>
 
@@ -332,22 +354,25 @@ stateDiagram-v2
   <div class="sec-head narrow">
     <span class="eyebrow">6 · 판단 규칙</span>
     <h2>MVP 판단 로직과 조정 파라미터</h2>
-    <p class="lead">MVP는 설명 가능한 규칙 기반 점수로 시작합니다. 결재자가 "왜 90점인가"를 신호별로 확인할 수 있어야 배임 우려를 풀 수 있기 때문입니다. 데이터가 쌓이면 가중치를 학습 모델로 바꿉니다.</p>
+    <p class="lead">MVP는 정책 문서에 적힌 규칙을 그대로 씁니다. 결재자가 "왜 동일 관련자인가"를 항목별로 확인할 수 있어야 하기 때문입니다. 등록 정보가 겹치는 것은 소명·감사 대상이며 부정 확정이 아닙니다.</p>
   </div>
   <div class="tbl-wrap">
     <table>
       <thead><tr><th>단계</th><th>규칙</th><th>기본값 (예시)</th><th>근거 데이터 · 비고</th></tr></thead>
       <tbody>
-        <tr><td>① 매칭</td><td>기준 거래처와 후보 거래처 사이의 신호별 가중 합산 점수<br><span class="small">자금 연결 40 (정산계좌 동일 40 · 다른 사업자 계좌로 입금 30) · 대표자명 30 · 사업장 주소 30 (완전 일치 30 · 같은 시 6)</span></td><td class="mono">100점 만점</td><td>m_agency_cv · fin_collection_history_cv · 가중치 <span class="tbd">입력 예정</span> · 연락처·등록 IP는 데이터가 없어 제외</td></tr>
-        <tr><td>① 매칭</td><td>점수 구간별 처리</td><td class="mono">≥90 자동 그룹 · 70~89 수동 검토 · &lt;70 미그룹</td><td>D-024 90 · D-037 76 · 박준호 대조군 30 · 구간 <span class="tbd">입력 예정</span></td></tr>
-        <tr><td>② 실적</td><td>정산월 그룹 매출 합계 ≥ 합산 기준선</td><td class="mono">월 정산 · 기준 2,000만 원</td><td>단일 대리점 최고 1,367만 원 · 기준선 <span class="tbd">입력 예정</span></td></tr>
-        <tr><td>② 요율</td><td>요청 요율이 일반 대리점 범위를 넘으면 차액을 표시하고, 과거 초과분은 사후 검토로 등록</td><td class="mono">일반 10.0~14.0% · 평균 12.1%</td><td>sales_rebate_payment_cv 222건 · 우대 요율표 <span class="tbd">입력 예정</span></td></tr>
-        <tr><td>예외 A</td><td>그룹 내 90일 초과 연체 채권이 있으면 보류하고 상계안 제시</td><td class="mono">연체 90일</td><td>fin_ar_aging_cv · 기준일수 <span class="tbd">입력 예정</span></td></tr>
-        <tr><td>예외 A</td><td>최근 N개월 품질팀 '악의적' 판정 클레임 3회 이상이면 보류</td><td class="mono">N = 6개월</td><td>qc_claims_cv에 판정 필드 없음 · 클레임은 C-고객 단위 → <span class="tbd">데이터 확보 후</span></td></tr>
+        <tr><td>① 관련자</td><td>식별정보 3개(대표자 · 사업장 주소 · 정산계좌) 가운데 일치하는 개수<br><span class="small">정산계좌는 마스터 등록 계좌와 실제 입금 계좌를 함께 대조 · 주소는 완전 일치만 인정</span></td><td class="mono">2개 이상 = 동일 관련자</td><td>data_dictionary §4 · m_agency_cv · fin_collection_history_cv</td></tr>
+        <tr><td>① 관련자</td><td>일치 관계는 전이적으로 연결 (A-B, A-C가 각각 2개 일치면 A·B·C가 한 그룹)</td><td class="mono">D-024 3개 · D-037 2개 · 박준호 대조군 1개</td><td>data_dictionary §4 · 1,225쌍 중 2개 이상 일치는 박상현 그룹뿐</td></tr>
+        <tr><td>② 한도</td><td>동일 관련자의 월 장려금 합계 &gt; 한도이면 영업임원 승인 대상</td><td class="mono">월 200만 원</td><td>approval_authority_policy 판매장려금 지급 한도 · 한 건 최대 186.7만 원</td></tr>
+        <tr><td>② 요율</td><td>요청 요율이 일반 대리점 범위를 넘으면 차액을 표시하고 영업팀 소명 대상으로 등록</td><td class="mono">일반 10.0~14.0% · 평균 12.1%</td><td>sales_rebate_payment_cv 222건 · 우대 요율을 뒷받침하는 정책 문서 없음</td></tr>
+        <tr><td>경고</td><td>그룹 내 90일 초과 연체 채권이 있으면 결재 화면에 경고로 표시 (보류하지 않음)</td><td class="mono">연체 90일</td><td>fin_ar_aging_cv · 기준일수 <span class="tbd">자체 설정</span> · 90일 초과 보유 대리점이 23곳이라 보류 기준으로는 쓰지 않음</td></tr>
+        <tr><td>예외 A</td><td>최근 N개월 품질팀 '악의적' 판정 클레임 3회 이상이면 보류</td><td class="mono">N = 6개월</td><td>원천 qc_claims_cv에 판정 필드가 없어 품질팀이 '품질 판정' 화면에서 등록 · 기준값은 명세 값</td></tr>
         <tr><td>예외 A</td><td>외부 보도는 확정 결함(defect_confirmed) 기준으로만 반영</td><td class="mono">미확정 보도 = 근거 제외</td><td>ext_news_quality_incident</td></tr>
-        <tr><td>③ 결재</td><td>결재선: 재무팀 → 내부감시팀 (금액이 기준을 넘으면 지주사 추가)</td><td class="mono">현행 영업지원팀 단독</td><td>지주사 결재 기준 <span class="tbd">입력 예정</span> · MVP 이후</td></tr>
-        <tr><td>③ 결재</td><td>그룹 현금 지표를 결재자에게 참고로 표시</td><td class="mono">Masil 약정 하한 30억</td><td>fin_cash_daily_ms(covenant_min_krw) · board_minutes</td></tr>
-        <tr><td>예외 B</td><td>거절 사유가 현금 부족이면 Masil CH-04 다음 발주에 크레딧을 제안하고 분할안도 함께 제시</td><td class="mono">크레딧 = 장려금 100% · 유효 90일</td><td>m_channel_ms · m_sku_ms · 비율·유효기간·Masil 정산 방식 <span class="tbd">입력 예정</span></td></tr>
+        <tr><td>③ 결재</td><td>결재선: 재무팀 → 내부감시팀 → 영업임원</td><td class="mono">현행 영업지원팀 단독</td><td>approval_authority_policy: 한도 초과 시 영업임원 승인. 재무·내부감시 검토는 이 기획이 더한 단계</td></tr>
+        <tr><td>③ 결재</td><td>Corevia 자체 현금 근거(월말 현금 추이 · 미회수 채권)를 결재자에게 표시. Masil 재전망은 대안 설계 참고로만 표시</td><td class="mono">현금 3개월 연속 감소 · 90일 초과 62.8억 원</td><td>fin_cash_daily_cv · fin_ar_aging_cv / covenant_terms_ms · sc_purchase_orders_ms</td></tr>
+        <tr><td>예외 B</td><td>거절 사유가 현금 부족이면 Masil CH-04 다음 발주에 크레딧을 제안하고 분할안도 함께 제시</td><td class="mono">크레딧 = 장려금 100% · 유효 90일</td><td>m_channel_ms · m_sku_ms(리드타임 최장 12주) · 비율·유효기간 <span class="tbd">자체 설정</span></td></tr>
+        <tr><td>예외 B</td><td>Corevia↔Masil 정산: Masil이 Corevia에 낼 발주 대금에서 크레딧만큼 차감</td><td class="mono">더마 제외 10건 18.3억 원 · 지급일 07-21</td><td>sc_purchase_orders_ms · 양사 합의 필요</td></tr>
+        <tr><td>예외 B</td><td>미종결 확정 결함이 있는 제품군은 크레딧 대상에서 제외하고 판단 근거를 감사 로그에 기록</td><td class="mono">PL-02 더마 4종 제외 · 10종 적용</td><td>qc_claims_cv: LOT-B-2602-P 확정 45건 · 36,522개. 다른 5개 제품군은 0건. 발주↔lot 연결 키가 없어 제품군 단위로 제외</td></tr>
+        <tr><td>사후 검토</td><td>과거에 합산 한도를 넘겼는데 임원 승인 없이 지급된 달을 내부감시팀 검토 목록에 등록</td><td class="mono">1~5월 22,238,349원</td><td>등록까지만 구현 · 환수·재승인 절차는 설계 단계</td></tr>
       </tbody>
     </table>
   </div>
@@ -373,6 +398,9 @@ stateDiagram-v2
         <tr><td class="mono">m_channel_ms · m_sku_ms</td><td class="mono">8 · 14</td><td>channel_type, payment_terms_days / sku, product_id, source_company</td><td>예외 B 크레딧 적용처·품목</td></tr>
         <tr><td class="mono">m_campaign_ms · m_influencer_ms</td><td class="mono">25 · 10</td><td>influencer_id, sales_channel, product_line, 기간</td><td>리스크 검사(판촉 중복)</td></tr>
         <tr><td class="mono">board_minutes · ext_news_quality_incident</td><td class="mono">문서</td><td>이사회 지침 / 미확정 보도</td><td>거절 사유·분할안·감사 로그 / 품질 판단 원칙</td></tr>
+        <tr><td class="mono">approval_authority_policy · data_dictionary</td><td class="mono">문서</td><td>판매장려금 지급 한도 / 동일 관련자 정의</td><td>① 관련자 판정 · ② 한도 · ③ 결재선</td></tr>
+        <tr><td class="mono">sc_purchase_orders_ms · fin_ap_aging_ms</td><td class="mono">14 · 24</td><td>po_id, supplier_id, amount_krw, payment_due_date</td><td>Masil 현금 재전망 · 예외 B 정산</td></tr>
+        <tr><td class="mono">covenant_terms_ms · lc0001_payment_term_notice</td><td class="mono">문서</td><td>재전망 방식·신규 약정 제한 / CH-03 결제조건 45→90일</td><td>③ 결재 참고</td></tr>
       </tbody>
     </table>
   </div>
@@ -380,12 +408,13 @@ stateDiagram-v2
     <table>
       <thead><tr><th>시스템 테이블</th><th>주요 컬럼</th><th>원천</th><th>용도</th></tr></thead>
       <tbody>
-        <tr><td class="mono">account_groups</td><td>group_id, agency_id, anchor_id, match_score, 신호별 점수(JSON), 확정자, 확정일</td><td>시스템 생성</td><td>① 결과 저장</td></tr>
-        <tr><td class="mono">incentive_requests</td><td>request_id, group_id, period_ym, rebate_ids[], 합산매출, 요청요율, 일반요율, 장려금액, status</td><td>시스템 생성 ← sales_rebate_payment_cv</td><td>상태 머신</td></tr>
+        <tr><td class="mono">account_groups</td><td>group_id, agency_id, anchor_id, 일치 개수, 항목별 일치(JSON), 확정자, 확정일</td><td>시스템 생성</td><td>① 결과 저장</td></tr>
+        <tr><td class="mono">incentive_requests</td><td>request_id, group_id, period_ym, rebate_ids[], 합산 장려금, 월 한도, 요청요율, 일반요율, status</td><td>시스템 생성 ← sales_rebate_payment_cv</td><td>상태 머신</td></tr>
         <tr><td class="mono">risk_checks</td><td>request_id, 항목(연체/품질/판촉/대상), 결과, 근거 행 id</td><td>시스템 생성</td><td>RISK_CHECK</td></tr>
         <tr><td class="mono">approvals</td><td>request_id, 결재단계, 결재자, 결정, 사유코드, 메모, 시각</td><td>시스템 생성</td><td>③ 결재</td></tr>
-        <tr><td class="mono">credits</td><td>credit_id, request_id, 금액, 적용 채널(CH-04), 적용 SKU, 유효기한, masil_po_id, 차감일</td><td>Masil 발주 연동 <span class="tbd">방식 미정</span></td><td>예외 B</td></tr>
+        <tr><td class="mono">credits</td><td>credit_id, request_id, 금액, 적용 채널(CH-04), 적용 SKU, 유효기한, masil_po_id, 차감일</td><td>sc_purchase_orders_ms 발주 대금 차감 (제안)</td><td>예외 B</td></tr>
         <tr><td class="mono">audit_log</td><td>event_id, request_id, actor, action, before/after, payload, 시각</td><td>시스템 생성</td><td>S7 · 내부 감사</td></tr>
+        <tr><td class="mono">claim_judgments</td><td>id, agency_id, claim_date, claim_type, judgment, memo, source, 등록자, 시각</td><td>품질팀 입력 (S8)</td><td>분기 A 악성 클레임 보류</td></tr>
       </tbody>
     </table>
   </div>
@@ -393,13 +422,15 @@ stateDiagram-v2
     <table class="gap">
       <thead><tr><th>데이터 공백</th><th>영향</th><th>처리</th></tr></thead>
       <tbody>
-        <tr><td>연락처 · 등록 IP</td><td>원래 설계한 매칭 신호 2개를 쓸 수 없음</td><td>대리점 마스터에 컬럼 추가 요청 <span class="tbd">입력 예정</span></td></tr>
-        <tr><td>품질팀 '악의적' 판정</td><td>분기 A의 원래 규칙(3회 이상)을 계산할 수 없음</td><td>qc_claims에 판정 필드 추가. 그 전까지는 연체 규칙으로 시연</td></tr>
+        <tr><td>마스터 변경 이력 · 소명 증빙</td><td>등록 정보가 언제 바뀌었는지, 공유 주소·계좌에 정당한 사유가 있는지 확인할 수 없음</td><td>소명 스레드에 증빙을 첨부받고 변경 이력을 수집</td></tr>
+        <tr><td>실제 지급 수취계좌</td><td>회수 계좌를 지급 계좌로 단정할 수 없음</td><td>지급 실행·은행 회신 자료 필요</td></tr>
+        <tr><td>품질팀 '악의적' 판정</td><td>원천 파일만으로는 분기 A 규칙을 계산할 수 없음</td><td>품질팀이 시스템에 판정을 등록. 시연은 명세 예시 3건을 '시연용 입력'으로 표시해 사용</td></tr>
         <tr><td>대리점 ↔ 클레임 · 판매 lot 연결</td><td>확정 결함 lot이 대리점과 관련 있는지 판정할 수 없음</td><td>대리점별 출고 lot 데이터 필요</td></tr>
         <tr><td>C-고객 마스터</td><td>C-101~C-112의 이름·성격을 알 수 없음</td><td>고객 마스터 업로드 필요</td></tr>
-        <tr><td>합산 기준선 · 우대 요율표</td><td>그룹 우대 요율 16.7%가 정당한지 판정할 수 없음</td><td>영업 정책 문서 입력 <span class="tbd">입력 예정</span></td></tr>
-        <tr><td>Masil 크레딧 정산 방식</td><td>크레딧이 Masil 현금에 주는 실제 영향을 확정할 수 없음</td><td>Corevia↔Masil 공급가 차감 방식 합의 필요</td></tr>
-        <tr><td>2026-07 이후 데이터</td><td>기준일 이후의 회수 여부를 알 수 없음</td><td>시나리오 ①·③은 연체 회수 완료를 가정</td></tr>
+        <tr><td>우대 요율 근거</td><td>그룹 요율 16.7%가 정당한지 판정할 수 없음 (정책 문서에 요율표 없음)</td><td>영업팀 소명 대상으로 등록, 결재자가 판단</td></tr>
+        <tr><td>Masil 크레딧 정산 방식</td><td>발주 대금 차감안은 이 기획의 제안이라 확정된 방식이 아님</td><td>Corevia↔Masil 합의 필요</td></tr>
+        <tr><td>2026-07 이후 데이터</td><td>기준일 이후의 회수 여부를 알 수 없음</td><td>연체는 경고로만 표시하고 회수 여부는 가정하지 않음</td></tr>
+        <tr><td>과거 한도 초과 지급의 후속</td><td>환수·재승인 기준과 절차가 정책 문서에 없음</td><td>사후 검토 등록까지만 구현, 이후는 설계 단계</td></tr>
       </tbody>
     </table>
   </div>
@@ -412,23 +443,23 @@ stateDiagram-v2
   </div>
   <div class="tbl-wrap">
     <table>
-      <thead><tr><th>기능</th><th>영업팀</th><th>재무팀</th><th>내부감시팀</th><th>품질팀</th><th>Masil</th></tr></thead>
+      <thead><tr><th>기능</th><th>영업팀</th><th>재무팀</th><th>내부감시팀</th><th>영업임원</th><th>품질팀</th><th>Masil</th></tr></thead>
       <tbody>
-        <tr><td>요청 생성 · 매칭 실행</td><td>●</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
-        <tr><td>매칭 근거 열람</td><td>●</td><td>●</td><td>●</td><td>–</td><td>–</td></tr>
-        <tr><td>수동 검토 그룹 확정</td><td>–</td><td>–</td><td>●</td><td>–</td><td>–</td></tr>
-        <tr><td>결재 승인 / 거절</td><td>–</td><td>● 1차</td><td>● 2차</td><td>–</td><td>–</td></tr>
-        <tr><td>연체 보류 해제 (회수·상계 확인)</td><td>–</td><td>●</td><td>열람</td><td>–</td><td>–</td></tr>
-        <tr><td>클레임 판정 · 품질 보류 해제</td><td>–</td><td>–</td><td>열람</td><td>●</td><td>–</td></tr>
-        <tr><td>소명 제출</td><td>●</td><td>–</td><td>–</td><td>●</td><td>–</td></tr>
-        <tr><td>사후 검토(과거 초과 지급분)</td><td>열람</td><td>열람</td><td>●</td><td>–</td><td>–</td></tr>
-        <tr><td>대안(크레딧) 수락</td><td>●</td><td>●</td><td>열람</td><td>–</td><td>–</td></tr>
-        <tr><td>크레딧 차감 확인</td><td>열람</td><td>열람</td><td>열람</td><td>–</td><td>●</td></tr>
-        <tr><td>데이터 업로드 (S0)</td><td>장려금 · 대리점</td><td>채권 · 수금 · 현금</td><td>–</td><td>클레임</td><td>채널 · SKU · 현금 · 캠페인</td></tr>
+        <tr><td>요청 생성 · 매칭 실행</td><td>●</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+        <tr><td>매칭 근거 열람</td><td>●</td><td>●</td><td>●</td><td>●</td><td>–</td><td>–</td></tr>
+        <tr><td>수동 검토 그룹 확정</td><td>–</td><td>–</td><td>●</td><td>–</td><td>–</td><td>–</td></tr>
+        <tr><td>결재 승인 / 거절</td><td>–</td><td>● 1차</td><td>● 2차</td><td>● 최종</td><td>–</td><td>–</td></tr>
+        <tr><td>연체 경고 확인 (결재 화면)</td><td>열람</td><td>●</td><td>●</td><td>●</td><td>–</td><td>–</td></tr>
+        <tr><td>클레임 '악의적' 판정 등록 · 품질 보류 해제</td><td>–</td><td>–</td><td>열람</td><td>–</td><td>●</td><td>–</td></tr>
+        <tr><td>소명 제출</td><td>●</td><td>–</td><td>–</td><td>–</td><td>●</td><td>–</td></tr>
+        <tr><td>사후 검토(과거 한도 초과 지급분)</td><td>열람</td><td>열람</td><td>●</td><td>열람</td><td>–</td><td>–</td></tr>
+        <tr><td>대안(크레딧) 수락</td><td>●</td><td>●</td><td>열람</td><td>열람</td><td>–</td><td>–</td></tr>
+        <tr><td>크레딧 차감 확인</td><td>열람</td><td>열람</td><td>열람</td><td>–</td><td>–</td><td>●</td></tr>
+        <tr><td>데이터 업로드 (S0)</td><td>장려금 · 대리점</td><td>채권 · 수금 · 현금</td><td>–</td><td>–</td><td>클레임</td><td>채널 · SKU · 현금 · 캠페인</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="small">현행: 장려금 승인·반려 200건을 모두 <b>영업지원팀</b>이 혼자 결재했습니다(sales_rebate_payment_cv.approver). MVP에서는 이 결재를 재무 → 내부감시 2단계로 바꿉니다.</p>
+  <p class="small">현행: 장려금 승인·반려 200건을 모두 <b>영업지원팀</b>이 혼자 결재했습니다(sales_rebate_payment_cv.approver). MVP에서는 재무 → 내부감시 검토를 거친 뒤, 합산 한도를 넘는 건은 정책대로 영업임원이 승인합니다.</p>
 </section>
 
 <section>
@@ -439,20 +470,23 @@ stateDiagram-v2
   <div class="scope">
     <div class="branch"><h3>MVP 포함</h3><ul>
       <li>S0~S7 화면, 역할을 바꿔 가며 시연</li>
-      <li>규칙 기반 매칭 점수 + 신호별 근거 + 동명이인 대조</li>
-      <li>합산 실적 · 요율 비교 · 과거 초과분 사후 검토 등록</li>
-      <li>90일 초과 연체 자동 보류 + 상계안 + 영업·재무 알림</li>
-      <li>재무 → 내부감시 2단계 결재, 사유 코드</li>
-      <li>현금 부족으로 거절 시 Masil 크레딧 대안 제안·수락 (약정 영향 표시)</li>
+      <li>동일 관련자 판정(2개 이상 일치 · 전이 연결) + 항목별 근거 + 동명이인 대조</li>
+      <li>합산 한도 비교 · 요율 비교 · 과거 한도 초과 지급분 사후 검토 등록</li>
+      <li>'악의적' 클레임 3건 이상 자동 보류 + 소명 스레드 + 영업·품질 알림</li>
+      <li>90일 초과 연체는 결재 화면 경고</li>
+      <li>운영 중 AI 에이전트(Claude): 결재 권고 · 소명 검토 · 대안 설명</li>
+      <li>재무 → 내부감시 → 영업임원 결재, 사유 코드</li>
+      <li>현금 부족으로 거절 시 Masil 크레딧 대안 제안·수락 (발주 대금 차감 정산 · Masil 재전망 표시)</li>
       <li>감사 로그 (수정할 수 없는 기록)</li>
     </ul></div>
     <div class="branch"><h3>MVP 이후</h3><ul>
-      <li>학습 기반 매칭 모델(가중치 자동 조정), 연락처·IP 신호 추가</li>
+      <li>마스터 변경 이력 · 소명 증빙 · 실제 지급 수취계좌 연동</li>
       <li>품질 '악의적' 판정 연동과 대리점별 출고 lot 연결</li>
       <li>Masil 발주 시스템 실시간 API 연동 (MVP는 수기 확인)</li>
-      <li>지주사(Aurora Holdings) 고액 결재선</li>
+      <li>약정 하회 예상 구간의 그룹 CEO 상신 연동 (covenant_terms_ms)</li>
       <li>그룹 현금흐름 예측과 지급 시점 추천</li>
       <li>메신저·메일 알림 연동 (MVP는 앱 내 알림)</li>
+      <li>과거 한도 초과 지급분의 환수·재승인 절차 (설계 단계)</li>
     </ul></div>
   </div>
 </section>
@@ -460,7 +494,7 @@ stateDiagram-v2
 </div>
 
 <script>
-/* 모든 값: hackathon_data (기준일 2026-06-30). 기준선·요율표·가중치는 예시값 */
+/* 모든 값: hackathon_data (기준일 2026-06-30). 판정 기준·한도는 정책 문서, 연체일수·크레딧 조건은 자체 설정 */
 const won = n => n.toLocaleString('ko-KR') + '원';
 const man = n => (n/1e4).toLocaleString('ko-KR',{maximumFractionDigits:1}) + '만';
 const D = {
@@ -470,25 +504,26 @@ const D = {
     {id:'D-024', name:'성일상사24', biz:'588-45-14362', addr:'성남시 상공로 128', acct:'하나 233-91-004417', sales:6890290, reb:1189046, rb:'RB-00120'},
     {id:'D-037', name:'대륙상사37', biz:'735-56-72118', addr:'성남시 번영로 77', acct:'국민 412-27-556310', sales:8228970, reb:1325536, rb:'RB-00180'}
   ],
-  threshold:20000000, topSingle:13670105,
+  limit:2000000, topSingle:1867253, nRows:240,
   stdAvg:12.1, stdAmt:2821144, prevPaid:22238349, prevExcess:5987976,
   overdue:29202840, arTotal:48481080,
-  cvCash:'190.8억', cvNet:'−8.8억', msCash:'51.5억', msHead:'21.5억', msTrend:'−7.0억/월'
+  cvCash:'190.8억', cvNet:'−8.8억', msCash:'51.5억', msHead:'21.5억', msTrend:'−7.0억/월', msBreach:'07-21', msLow:'14.7억', poTotal:'37.5억'
 };
 D.total = D.M.reduce((s,m)=>s+m.sales,0);      // 23,324,352
 D.amount = D.M.reduce((s,m)=>s+m.reb,0);       // 3,888,097
 D.rate = (D.amount/D.total*100).toFixed(1);    // 16.7
 D.diff = D.amount - D.stdAmt;                  // 1,066,953
+/* 식별정보 3개: [이름, 근거, 만점 1, 일치 1/불일치 0] */
 const SIG = {
-  'D-024':[['자금 연결','D-024 미수금을 D-011 계좌에서 입금 (DP-00013·14)',40,30],['대표자명','박상현 = 박상현',30,30],['사업장 주소','성남시 상공로 128 완전 일치',30,30]],
-  'D-037':[['자금 연결','정산계좌 동일 국민 412-27-556310',40,40],['대표자명','박상현 = 박상현',30,30],['사업장 주소','같은 성남시 · 도로명 다름',30,6]]
+  'D-024':[['대표자','박상현 = 박상현',1,1],['사업장 주소','성남시 상공로 128 완전 일치',1,1],['정산계좌','등록 계좌는 다르나 실제 입금 계좌 일치 (DP-00013·14 → D-011 계좌)',1,1]],
+  'D-037':[['대표자','박상현 = 박상현',1,1],['사업장 주소','성남시 번영로 77 · 같은 성남시이나 도로명이 달라 불일치',1,0],['정산계좌','등록 계좌 동일 국민 412-27-556310',1,1]]
 };
-const sc = id => SIG[id].reduce((s,x)=>s+x[3],0);   // D-024 90, D-037 76
+const sc = id => SIG[id].reduce((s,x)=>s+x[3],0);   // D-024 3, D-037 2 (2개 이상 = 동일 관련자)
+const CLAIMS = [['QJ-0001','2026-05-21','변질 주장'],['QJ-0002','2026-04-03','성분 이상'],['QJ-0003','2026-02-10','포장 파손']];   // 명세 예시 · 시연용 입력
 const AR90 = [['AR-D00125','D-037',7357018,176],['AR-D00092','D-011',4337720,164],['AR-D00109','D-024',5848364,162],['AR-D00090','D-011',6826200,137],['AR-D00108','D-024',4833538,133]];
 
 const NAV = ['요청함','거래처 그룹','결재함','알림','감사 로그','데이터 연결'];
-const sigRows = arr => arr.map(s=>`<div class="sig"><span>${s[0]}<br><span class="small">${s[1]}</span></span><div class="bar"><i style="width:${s[3]/s[2]*100}%"></i></div><span class="mono">${s[3]}/${s[2]}</span></div>`).join('')
-  + `<div class="sig na"><span>연락처 · 등록 IP<br><span class="small">데이터 없음 · 수집 예정</span></span><div class="bar"></div><span class="mono">–</span></div>`;
+const sigRows = arr => arr.map(s=>`<div class="sig"><span>${s[0]}<br><span class="small">${s[1]}</span></span><div class="bar"><i style="width:${s[3]/s[2]*100}%"></i></div><span class="mono">${s[3]?'일치':'불일치'}</span></div>`).join('');
 
 /* ---------- 화면 렌더러 ---------- */
 const S = {
@@ -508,49 +543,36 @@ const S = {
    <div class="field">기준 거래처<div class="v">D-011 금강상사11 (${D.M[0].biz})</div></div>
    <div class="field">정산월<div class="v">2026-06 (지급 예정 07.04~07.09)</div></div>
   </div>
-  <div class="field">요청 사유<div class="v">D-024·D-037과 같은 대표(박상현)가 운영합니다. 합산 월매출을 기준으로 우대 요율 적용을 요청합니다.</div></div>
+  <div class="field">요청 사유<div class="v">D-024·D-037과 같은 대표(박상현)가 운영합니다. 세 곳의 장려금을 합산해 한도 심사를 요청합니다.</div></div>
   <div class="box dash"><span class="small">관련 거래처 후보 (영업 입력, 선택)</span><div class="row"><span class="pill neutral">D-024 성일상사24 ✕</span><span class="pill neutral">D-037 대륙상사37 ✕</span><span class="small">+ 추가</span></div></div>
   <div class="row"><button class="btn primary hot">AI 관련 거래처 매칭 실행</button><button class="btn">임시 저장</button></div>`,
 
  match: () => `
-  <div class="scr-title"><h3>관련 거래처 매칭 결과</h3><span class="pill info">MATCHING</span></div>
+  <div class="scr-title"><h3>동일 관련자 판정 결과</h3><span class="pill info">MATCHING</span></div>
   <div class="box ai"><span class="ai-tag">AI 판단 · 기준 D-011</span>
-   <p style="font-size:.88rem">D-024는 <b>${sc('D-024')}점</b>으로 자동 그룹 기준(90점)에 해당합니다. D-037은 <b>${sc('D-037')}점</b>이라 내부감시팀 수동 검토로 넘깁니다. 정산계좌는 같지만 주소가 다르기 때문입니다.</p></div>
-  <div class="mcard"><div class="hd"><b>D-024 성일상사24</b><span><span class="sc">${sc('D-024')}</span> <span class="pill ok">자동 그룹</span></span></div>${sigRows(SIG['D-024'])}</div>
-  <div class="mcard"><div class="hd"><b>D-037 대륙상사37</b><span><span class="sc">${sc('D-037')}</span> <span class="pill warn">수동 검토</span></span></div>${sigRows(SIG['D-037'])}</div>
-  <div class="box dash" style="padding:10px"><span class="small">대조 · 동명이인 박준호 (D-034 ↔ D-041): 이름만 일치, 주소·계좌 다름 → <b>30점 미그룹</b></span></div>
-  <div class="row"><button class="btn primary hot">D-024 확정 · D-037 검토 요청</button><button class="btn">거래처 제외</button></div>`,
-
- review: () => `
-  <div class="scr-title"><h3>수동 검토 · D-037 대륙상사37</h3><span class="pill warn">MANUAL_REVIEW</span></div>
-  <div class="box"><dl class="kv">
-   <dt>매칭 점수</dt><dd class="mono">${sc('D-037')} / 100</dd>
-   <dt>정산계좌</dt><dd>국민 412-27-556310 · D-011과 같은 계좌</dd>
-   <dt>실제 입금</dt><dd class="mono">DP-00020 · 2026-04-08 · 11,915,400원 (AR-D00125)</dd>
-   <dt>대표자</dt><dd>박상현 (D-011 · D-024와 같음)</dd>
-   <dt>불일치</dt><dd>주소 성남시 번영로 77 · 사업자번호 735-56-72118</dd>
-  </dl></div>
-  <div class="box ai"><span class="ai-tag">AI 근거 요약</span><p style="font-size:.88rem">서로 다른 두 사업자가 한 계좌로 정산하고 있습니다. 대표자도 같아 자금 흐름 기준으로 지배구조가 겹칩니다. 주소가 다른 것은 별도 사업장으로 볼 수 있습니다.</p></div>
-  <div class="row"><button class="btn primary hot">그룹 확정 (근거 서명)</button><button class="btn">그룹에서 제외</button></div>
-  <p class="note">AI는 근거만 보여주고, 확정은 내부감시팀 담당자가 이름을 남기고 합니다.</p>`,
+   <p style="font-size:.88rem">대표자·주소·정산계좌 중 2개 이상 일치하면 동일 관련자입니다. D-024는 <b>${sc('D-024')}개</b>, D-037은 <b>${sc('D-037')}개</b>가 일치해 둘 다 D-011과 한 그룹입니다. 등록 정보가 겹치는 것은 소명·감사 대상이며 부정 확정이 아닙니다.</p></div>
+  <div class="mcard"><div class="hd"><b>D-024 성일상사24</b><span><span class="sc">${sc('D-024')}/3</span> <span class="pill ok">동일 관련자</span></span></div>${sigRows(SIG['D-024'])}</div>
+  <div class="mcard"><div class="hd"><b>D-037 대륙상사37</b><span><span class="sc">${sc('D-037')}/3</span> <span class="pill ok">동일 관련자</span></span></div>${sigRows(SIG['D-037'])}</div>
+  <div class="box dash" style="padding:10px"><span class="small">대조 · 동명이인 박준호 (D-034 ↔ D-041): 대표자 이름만 일치, 주소·계좌 다름 → <b>1개 일치 · 미그룹</b></span></div>
+  <div class="row"><button class="btn primary hot">그룹 확정 · 한도 검증</button><button class="btn">거래처 제외</button></div>`,
 
  calc: () => {
-  const max = 26000000, w = m => m.sales/max*100, pt = D.threshold/max*100, cls=['a','b','c'];
+  const max = 4600000, w = m => m.reb/max*100, pt = D.limit/max*100, cls=['a','b','c'];
   return `
-  <div class="scr-title"><h3>실적 합산 · 조건 검증</h3><span class="pill info">MATCHING</span></div>
+  <div class="scr-title"><h3>관련자 합산 · 지급 한도 검증</h3><span class="pill info">MATCHING</span></div>
   <div class="box">
-   <div class="row" style="justify-content:space-between"><span class="small">2026-06 그룹 매출 (3개 사업자)</span><span class="mono">${man(D.total)} / 기준 ${man(D.threshold)} <span class="tbd">예시</span></span></div>
-   <div style="padding-top:22px"><div class="stack">${D.M.map((m,i)=>`<i class="${cls[i]}" style="width:${w(m)}%">${m.id.slice(2)} ${man(m.sales)}</i>`).join('')}<span class="th" style="left:${pt}%"><em>기준 2,000만</em></span></div></div>
-   <p class="small">대리점별로는 689만~823만 원으로 모두 기준에 못 미칩니다. 대리점 1곳의 월매출 최고치(D-009, ${man(D.topSingle)})도 기준보다 낮습니다. 3곳을 합하면 기준을 ${man(D.total-D.threshold)} 넘습니다.</p>
+   <div class="row" style="justify-content:space-between"><span class="small">2026-06 그룹 장려금 (3개 사업자)</span><span class="mono">${won(D.amount)} / 한도 ${won(D.limit)}</span></div>
+   <div style="padding-top:22px"><div class="stack">${D.M.map((m,i)=>`<i class="${cls[i]}" style="width:${w(m)}%">${m.id.slice(2)} ${man(m.reb)}</i>`).join('')}<span class="th" style="left:${pt}%"><em>한도 200만</em></span></div></div>
+   <p class="small">거래처별로는 118.9만~137.4만 원이라 따로 보면 모두 영업지원팀 전결 범위입니다. 전체 ${D.nRows}건 중 한 건으로 한도를 넘는 장려금은 없습니다(최대 ${won(D.topSingle)}). 3곳을 합하면 한도를 ${won(D.amount-D.limit)} 넘어 <b>영업임원 승인</b>이 필요합니다.</p>
   </div>
   <div class="box ai"><span class="ai-tag">AI 계산</span>
-   <dl class="kv"><dt>합산 매출</dt><dd class="mono">${won(D.total)}</dd>
-   <dt>요청 장려금</dt><dd class="mono"><b>${won(D.amount)}</b> · 요율 ${D.rate}%</dd>
+   <dl class="kv"><dt>합산 장려금</dt><dd class="mono"><b>${won(D.amount)}</b> · 한도의 ${(D.amount/D.limit).toFixed(1)}배</dd>
+   <dt>합산 매출 · 요율</dt><dd class="mono">${won(D.total)} · ${D.rate}%</dd>
    <dt>일반 요율</dt><dd class="mono">10.0~14.0% (평균 ${D.stdAvg}%, 222건)</dd>
    <dt>일반 적용 시</dt><dd class="mono">${won(D.stdAmt)} (차이 +${won(D.diff)})</dd></dl>
-   <p class="small">우대 요율표가 아직 없어(<span class="tbd">입력 예정</span>) 요율이 정당한지는 결재자가 판단합니다.</p>
+   <p class="small">우대 요율을 뒷받침하는 정책 문서가 데이터에 없습니다. 요율 차이는 결재자가 영업팀 소명을 받아 판단합니다.</p>
   </div>
-  <div class="box hold"><b>사후 검토 자동 등록</b><span class="small">1~5월에도 같은 우대 요율로 ${won(D.prevPaid)}이 영업지원팀 단독 결재로 지급됐습니다. 이 중 일반 평균보다 많이 나간 ${won(D.prevExcess)}을 내부감시팀 검토 목록에 올립니다.</span></div>
+  <div class="box hold"><b>사후 검토 자동 등록</b><span class="small">1~5월에도 매달 합산 405.5만~487.0만 원으로 한도를 넘었는데, ${won(D.prevPaid)}이 영업지원팀 단독 결재로 지급됐습니다. 이 중 일반 평균 요율보다 많이 나간 금액은 ${won(D.prevExcess)}입니다. 내부감시팀 검토 목록에 올립니다.</span></div>
   <div class="row"><button class="btn primary hot">리스크 검사 진행</button></div>`;
  },
 
@@ -561,13 +583,15 @@ const S = {
   <div class="scr-title"><h3>결재함</h3><span class="pill info">AWAITING_APPROVAL</span></div>
   <div class="modal-scrim"><div class="modal">
    <span class="ai-tag">결재 요청 · ${D.reqId}</span>
-   <h3>관련 거래처 3곳의 합산 실적이 기준을 넘었습니다 (매칭 90·76점). 장려금 지급을 승인하시겠습니까?</h3>
-   <dl class="kv"><dt>그룹</dt><dd>D-011 + D-024 + D-037 (대표 박상현)</dd><dt>합산 매출</dt><dd class="mono">${won(D.total)}</dd><dt>장려금</dt><dd class="mono"><b>${won(D.amount)}</b> · ${D.rate}% (일반 대비 +${won(D.diff)})</dd><dt>리스크</dt><dd><span class="pill ok">연체 해소 · 판촉 중복 없음</span></dd></dl>
-   <div class="box dash" style="padding:10px;gap:6px"><span class="small">참고 · 그룹 현금 (2026-06-30)</span>
-    <div class="row"><span class="small" style="width:60px">Corevia</span><span class="pill ok">${D.cvCash} · 6월 ${D.cvNet}</span></div>
-    <div class="row"><span class="small" style="width:60px">Masil</span><span class="pill ${o.cash==='low'?'crit':'warn'}">${D.msCash} · 약정 하한까지 ${D.msHead} · ${D.msTrend}</span></div>
+   <h3>동일 관련자 3곳의 합산 장려금이 월 한도 200만 원을 넘었습니다 (일치 3/3 · 2/3). 지급을 승인하시겠습니까?</h3>
+   <dl class="kv"><dt>그룹</dt><dd>D-011 + D-024 + D-037 (대표 박상현)</dd><dt>합산 장려금</dt><dd class="mono"><b>${won(D.amount)}</b> · 한도 ${won(D.limit)}의 ${(D.amount/D.limit).toFixed(1)}배</dd><dt>요율</dt><dd class="mono">${D.rate}% (일반 대비 +${won(D.diff)})</dd><dt>리스크</dt><dd><span class="pill warn">연체 경고</span> <span class="pill ok">악성 클레임 없음 · 판촉 중복 없음</span></dd></dl>
+   <div class="box hold" style="padding:10px"><b>⚠ 경고 · 이 그룹에 90일 초과 미회수 채권 ${won(D.overdue)} (5건)</b><span class="small">이번 장려금의 7.5배 · 보류 사유는 아니며 현금 지급 여부는 결재자가 판단</span></div>
+   <div class="box dash" style="padding:10px;gap:6px"><span class="small">Corevia 자체 현금 근거 (2026-06-30)</span>
+    <div class="row"><span class="small" style="width:60px">현금</span><span class="pill warn">${D.cvCash} · 3개월 연속 감소 −27.7억</span></div>
+    <div class="row"><span class="small" style="width:60px">채권</span><span class="pill warn">90일 초과 미회수 62.8억 (38건)</span></div>
    </div>
-   <div class="row"><span class="small">결재선</span><span class="pill ${o.fin==='ok'?'ok':o.fin==='no'?'crit':'info'}">재무팀 ${o.fin==='ok'?'승인':o.fin==='no'?'거절':'검토 중'}</span><span>→</span><span class="pill ${o.aud==='ok'?'ok':'neutral'}">내부감시팀 ${o.aud==='ok'?'승인':'대기'}</span></div>
+   <div class="box ai" style="padding:10px"><span class="ai-tag">AI 권고 · 조건부 승인</span><span class="small">관련자·한도 검사는 통과했습니다. 이 그룹에서 받을 돈이 밀려 있고 현금이 줄고 있어 현금 지급 여부는 재무팀 판단이 필요합니다. 영업팀에 확인할 것: 우대 요율 16.7%의 근거.</span></div>
+   <div class="row"><span class="small">결재선</span><span class="pill ${o.fin==='ok'?'ok':o.fin==='no'?'crit':'info'}">재무팀 ${o.fin==='ok'?'승인':o.fin==='no'?'거절':'검토 중'}</span><span>→</span><span class="pill ${o.aud==='ok'?'ok':o.fin==='ok'?'info':'neutral'}">내부감시팀 ${o.aud==='ok'?'승인':o.fin==='ok'?'검토 중':'대기'}</span><span>→</span><span class="pill ${o.aud==='ok'?'info':'neutral'}">영업임원 ${o.aud==='ok'?'검토 중':'대기'}</span></div>
    <div class="row" style="justify-content:flex-end">
     <button class="btn danger ${o.hot==='no'?'hot':''}">거절</button>
     <button class="btn primary ${o.hot==='ok'?'hot':''}">승인</button>
@@ -579,11 +603,11 @@ const S = {
   <div class="modal-scrim"><div class="modal">
    <h3>거절 사유를 선택하세요</h3>
    <div class="check" style="gap:8px">
-    <label class="row"><span class="mono">◉</span> <b>CASH_SHORTAGE</b> · 그룹 유동성 방어로 현금 지급 불가</label>
+    <label class="row"><span class="mono">◉</span> <b>CASH_SHORTAGE</b> · Corevia 현금 유출 억제로 현금 지급 불가</label>
     <label class="row small"><span class="mono">○</span> MATCH_DOUBT · 관련 거래처 근거 부족</label>
     <label class="row small"><span class="mono">○</span> RATE_EXCESS · 우대 요율 근거 없음</label>
    </div>
-   <div class="field">메모<div class="v">Masil 현금 51.5억 원, 약정 하한까지 21.5억 원 남았습니다. 1~6월 추세대로면 10월 초에 하한에 닿습니다. 이사회 지침(방어 수요 우선)에 따라 이번 달 현금 지급은 할 수 없습니다.</div></div>
+   <div class="field">메모<div class="v">Corevia 월말 현금이 3개월 연속 줄었습니다(218.5억 → 190.8억 원). 이 그룹에서 받을 90일 초과 채권 29,202,840원이 밀려 있어, 회수 전에는 현금으로 지급하지 않습니다.</div></div>
    <div class="row" style="justify-content:flex-end"><button class="btn danger hot">거절 확정</button></div>
   </div></div>`,
 
@@ -594,11 +618,13 @@ const S = {
    <h3>Masil 대리점 정산채널(CH-04)의 다음 발주에서 '재고 할인(Credit)'으로 대신 지급</h3>
    <dl class="kv"><dt>크레딧 금액</dt><dd class="mono">${won(D.amount)} (장려금 100%)</dd>
    <dt>적용처</dt><dd>CH-04 · D-011·D-024·D-037 다음 발주서 (결제조건 30일)</dd>
-   <dt>적용 품목</dt><dd>Corevia SKU 14종 중 10종 · <span class="small">PL-02 더마 4종은 확정 결함 lot 때문에 제외</span></dd>
-   <dt>유효기간</dt><dd class="mono">90일 (~2026-09-29)</dd>
+   <dt>적용 품목</dt><dd>Corevia SKU 14종 중 10종 · <span class="small">PL-02 더마 4종 제외</span></dd>
+   <dt>제외 판단 근거</dt><dd class="small">미종결 확정 결함은 6개 제품군 중 PL-02에만 있음(LOT-B-2602-P · 45건 · 36,522개). 발주와 lot을 잇는 키가 없어 제품군 단위로 제외. 감사 로그에 기록</dd>
+   <dt>유효기간</dt><dd class="mono">90일 (~2026-09-28) <span class="tbd">비율·기간 자체 설정</span></dd>
    <dt>Corevia 현금</dt><dd>이번 달 유출 0원, 매출 할인으로 처리</dd>
-   <dt>Masil 영향</dt><dd class="mono">약정 여유 21.5억 원 대비 0.18% <span class="tbd">정산 방식 입력 예정</span></dd></dl>
-   <p class="small">분할안(이사회 지침상 허용): 크레딧 50% + Masil 약정 리스크가 풀린 뒤 현금 50%.</p>
+   <dt>Corevia↔Masil 정산</dt><dd>Masil이 7월 21일 Corevia에 낼 발주 대금 중 더마를 뺀 10건 18.3억 원(SPO-0005~0014)에서 같은 금액 차감 <span class="small">· 양사 합의 필요</span></dd>
+   <dt>Masil 영향</dt><dd>대리점에서 덜 받는 만큼 Corevia에 덜 내므로 현금 중립</dd></dl>
+   <p class="small">분할안: 크레딧 50% + 이 그룹 연체 채권 회수 뒤 현금 50%.</p>
   </div>
   <div class="row"><span class="pill ${o.s?'ok':'neutral'}">영업팀 ${o.s?'수락':'대기'}</span><span class="pill ${o.f?'ok':'neutral'}">재무팀 ${o.f?'수락':'대기'}</span></div>
   <div class="row"><button class="btn primary hot">${o.s?'재무팀으로 수락':'영업팀으로 수락'}</button><button class="btn">분할안으로 변경</button></div>`,
@@ -611,7 +637,8 @@ const S = {
     <tr><td>최근 CH-04 청구</td><td class="mono">MAR-0008 06-15 · MAR-0007 06-17</td></tr>
     <tr><td>다음 발주 예상</td><td>2026-07 중순</td></tr>
     <tr><td>CH-04 6월 회수율</td><td class="mono">92.1%</td></tr>
-    <tr><td>차감 방식</td><td>발주 공급가에서 크레딧 먼저 차감</td></tr>
+    <tr><td>차감 방식</td><td>대리점 발주서에서 크레딧 먼저 차감</td></tr>
+    <tr><td>Corevia↔Masil</td><td>07-21 발주 대금(더마 제외 18.3억 원)에서 같은 금액 차감</td></tr>
     <tr><td>상태 전환</td><td>발주서 반영 확인 시 CREDIT_SETTLED</td></tr>
    </tbody></table>
   </div>
@@ -623,40 +650,44 @@ const S = {
   <div class="tbl-wrap"><table class="mini-tbl"><thead><tr><th>장려금 ID</th><th>대리점</th><th>금액</th><th>계좌</th></tr></thead><tbody>
    ${D.M.map(m=>`<tr><td class="mono">${m.rb}</td><td>${m.id}</td><td class="mono">${m.reb.toLocaleString()}</td><td class="mono small">${m.acct}</td></tr>`).join('')}
   </tbody></table></div>
-  <div class="box"><dl class="kv"><dt>매칭</dt><dd>D-024 90 자동 · D-037 76 내부감시 확정</dd><dt>실적</dt><dd class="mono">${won(D.total)} ≥ ${won(D.threshold)}</dd><dt>결재</dt><dd>재무팀 승인 → 내부감시팀 승인</dd><dt>사후 검토</dt><dd class="mono">1~5월 초과분 ${won(D.prevExcess)} 별도 진행</dd></dl></div>
-  <p class="note">매칭 근거·계산값·결재자가 감사 로그에 남아, 배임 소지에 대해 사후에 설명할 자료가 됩니다.</p>`,
+  <div class="box"><dl class="kv"><dt>관련자</dt><dd>D-024 3/3 · D-037 2/3 일치 → 동일 관련자</dd><dt>한도</dt><dd class="mono">합산 ${won(D.amount)} &gt; 월 ${won(D.limit)}</dd><dt>결재</dt><dd>재무팀 → 내부감시팀 → 영업임원 승인</dd><dt>사후 검토</dt><dd class="mono">1~5월 한도 초과 지급 ${won(D.prevPaid)} 별도 진행</dd></dl></div>
+  <p class="note">관련자 근거·합산 금액·결재자가 감사 로그에 남아, 한도 통제를 지켰는지 사후에 설명할 자료가 됩니다.</p>`,
 
  hold: (o) => `
   <div class="scr-title"><h3>지급 보류</h3><span class="pill warn">PENDING</span></div>
-  <div class="box hold"><b>⚠ 그룹 연체 채권 감지: 지급 보류 및 사유 소명 요망</b><span class="small">90일 초과 미회수 ${won(D.overdue)} (5건) · 가장 오래된 건 176일 · 그룹 미회수 합계 ${won(D.arTotal)}</span></div>
-  <div class="row"><span class="pill info">→ 영업팀 알림 발송</span><span class="pill info">→ 재무팀(채권) 알림 발송</span></div>
-  <div class="box ai"><span class="ai-tag">AI 상계안</span><p style="font-size:.88rem">장려금 ${won(D.amount)}을 연체 채권과 상계하면, 90일 초과 잔액은 <b>${won(D.overdue-D.amount)}</b>으로 줄어듭니다.</p></div>
+  <div class="box hold"><b>⚠ 악성 클레임 감지: 지급 보류 및 사유 소명 요망</b><span class="small">D-024 성일상사24 · 최근 6개월 '악의적' 판정 ${CLAIMS.length}건 (기준 3건 이상)</span></div>
+  <div class="row"><span class="pill info">→ 영업팀 알림 발송</span><span class="pill info">→ 품질팀 알림 발송</span></div>
   <div class="box"><h3 style="font-size:.86rem">소명 스레드</h3>
-   <div class="field">영업팀 소명<div class="v" style="color:var(--muted)">회수 계획 또는 소명 내용 입력…</div></div>
-   <div class="row"><button class="btn primary ${o.hot?'hot':''}">소명 제출</button><button class="btn">상계 요청</button></div>
-   <span class="small">재무팀이 회수 또는 상계를 확인하면 리스크 검사로 돌아가고, 소명이 기각되면 종결합니다.</span>
+   ${o.done ? `<div class="field">영업팀 소명<div class="v">세 건 모두 같은 담당자가 접수했습니다. 반품 실물을 회수해 품질팀에 넘기고, 재발 시 장려금 대상에서 빼는 조건에 동의합니다.</div></div>
+   <div class="box ai" style="padding:10px"><span class="ai-tag">AI 소명 검토</span><span class="small">경위와 재발 방지 조건은 있으나 반품 실물 회수 일정이 없습니다. 추가로 필요한 것: 회수 예정일, 품질팀 재검사 결과. 해제 여부는 품질팀이 결정합니다.</span></div>
+   <div class="row"><button class="btn primary hot">품질팀 해제</button><button class="btn">소명 기각 · 종결</button></div>`
+   : `<div class="field">영업팀 소명<div class="v" style="color:var(--muted)">클레임 경위와 재발 방지 계획 입력…</div></div>
+   <div class="row"><button class="btn primary ${o.hot?'hot':''}">소명 제출</button></div>`}
+   <span class="small">영업팀이 소명하고 품질팀이 해제해야 리스크 검사로 돌아갑니다. 소명이 기각되면 종결합니다.</span>
   </div>`
 };
 function risk(fail){
   const tbl = fail
-   ? `<div class="tbl-wrap"><table class="mini-tbl"><thead><tr><th>채권</th><th>대리점</th><th>미회수</th><th>경과</th></tr></thead><tbody>
-      ${AR90.map(a=>`<tr><td class="mono">${a[0]}</td><td>${a[1]}</td><td class="mono">${a[2].toLocaleString()}</td><td><span class="pill crit">${a[3]}일</span></td></tr>`).join('')}</tbody></table></div>`
+   ? `<div class="tbl-wrap"><table class="mini-tbl"><thead><tr><th>판정</th><th>일자</th><th>대리점 · 유형</th><th>출처</th></tr></thead><tbody>
+      ${CLAIMS.map(c=>`<tr><td class="mono">${c[0]}</td><td class="mono">${c[1]}</td><td>D-024 ${c[2]}</td><td><span class="pill warn">시연용 입력</span></td></tr>`).join('')}</tbody></table></div>`
    : `<div class="tbl-wrap"><table class="mini-tbl"><thead><tr><th>품질 신호</th><th>내용</th><th>판단</th></tr></thead><tbody>
-      <tr><td>대리점 클레임</td><td>0건 (클레임 165건 모두 C-고객 단위)</td><td><span class="pill neutral">해당 없음</span></td></tr>
+      <tr><td>'악의적' 판정</td><td>그룹 3곳 모두 0건 (품질팀 등록 기준)</td><td><span class="pill ok">해당 없음</span></td></tr>
       <tr><td class="mono">LOT-B-2602-P</td><td>PL-02 더마 · 확정 45건 · 36,522개</td><td><span class="pill warn">대리점 연결 데이터 없음</span></td></tr>
       <tr><td>언론 보도</td><td>단일 매체 · 제품 미지목 · 미확정</td><td><span class="pill neutral">근거 제외</span></td></tr></tbody></table></div>`;
   return `
   <div class="scr-title"><h3>리스크 검사</h3><span class="pill ${fail?'warn':'info'}">RISK_CHECK</span></div>
   <ul class="check box">
-   <li><span class="m ok">✓</span>관련 거래처: D-024 ${sc('D-024')}점 자동 · D-037 ${sc('D-037')}점 내부감시 확정</li>
-   <li><span class="m ok">✓</span>합산 실적 기준 초과 (${man(D.total)} ≥ ${man(D.threshold)})</li>
+   <li><span class="m ok">✓</span>동일 관련자: D-024 ${sc('D-024')}/3 · D-037 ${sc('D-037')}/3 일치</li>
+   <li><span class="m w">△</span>합산 한도 초과 (${won(D.amount)} &gt; ${won(D.limit)}) → 영업임원 승인 대상</li>
+   <li><span class="m w">△</span>1~5월 한도 초과 지급 ${won(D.prevPaid)} (임원 승인 없음) → 사후 검토 등록 <span class="small">(환수·재승인은 설계 단계)</span></li>
    <li><span class="m ok">✓</span>장려금 대상(rebate_eligible) 3곳 모두 True · 1~5월 반려 0건</li>
-   <li><span class="m ${fail?'x':'ok'}">${fail?'✕':'✓'}</span>채권: ${fail?`90일 초과 연체 5건 ${won(D.overdue)} <span class="pill crit">보류 기준</span>`:'90일 초과 연체 회수 완료 <span class="small">(2026-07 회수 가정 · 원 데이터는 시나리오 ②)</span>'}</li>
+   <li><span class="m ${fail?'x':'ok'}">${fail?'✕':'✓'}</span>악성 클레임: ${fail?`최근 6개월 '악의적' 판정 ${CLAIMS.length}건 (D-024) <span class="pill crit">보류 기준</span>`:"최근 6개월 '악의적' 판정 0건"}</li>
+   <li><span class="m w">△</span>채권: 90일 초과 연체 5건 ${won(D.overdue)} <span class="small">(보류하지 않고 결재 화면에 경고)</span></li>
    <li><span class="m ok">✓</span>판촉 중복: Masil 캠페인 25건 중 대리점 채널 0건</li>
-   <li><span class="m w">△</span>품질: 대리점 단위 클레임 없음 · 확정 결함 lot과의 연결은 확인 불가</li>
+   <li><span class="m w">△</span>품질: 확정 결함 lot과 대리점의 연결은 확인 불가 · 외부 보도는 미확정이라 근거 제외</li>
   </ul>
   ${tbl}
-  <div class="box ai"><span class="ai-tag">AI 판단</span><p style="font-size:.88rem">${fail?'연체 채권 보류 기준에 해당합니다. 결재로 넘기지 않고 <b>자동 보류</b>합니다.':'보류 사유가 없습니다. 품질 항목은 결재자 참고로만 표시하고 재무팀·내부감시팀 결재로 넘깁니다.'}</p></div>
+  <div class="box ai"><span class="ai-tag">AI 판단</span><p style="font-size:.88rem">${fail?'악성 클레임 보류 기준에 해당합니다. 결재로 넘기지 않고 <b>자동 보류</b>합니다.':'보류 사유가 없습니다. 연체와 품질 항목은 결재자에게 경고·참고로 표시하고 재무팀 결재로 넘깁니다.'}</p></div>
   <div class="row"><button class="btn primary hot">${fail?'보류 처리 확인':'결재 요청 발송'}</button></div>`;
 }
 
@@ -664,34 +695,35 @@ function risk(fail){
 const base = [
  {s:'dash', role:'영업팀', nav:0, label:'영업팀이 요청함에서 새 요청', log:'영업팀 · 2026-06 장려금 요청 작성 시작'},
  {s:'request', role:'영업팀', nav:0, label:'D-011 · 2026-06 입력, 매칭 실행', log:`요청 ${D.reqId} 생성 · REQUESTED`},
- {s:'match', role:'영업팀', nav:1, label:`AI 매칭 D-024 ${sc('D-024')} · D-037 ${sc('D-037')}`, log:`AI 매칭 · D-024 ${sc('D-024')}점 자동 그룹 · D-037 ${sc('D-037')}점 수동 검토`},
- {s:'review', role:'내부감시팀', nav:1, label:'내부감시팀이 D-037 근거 확인 → 확정', log:'내부감시팀 · D-037 그룹 확정 (정산계좌 동일 근거)'},
- {s:'calc', role:'영업팀', nav:1, label:'합산 실적 기준 초과 · 요율 비교', log:`합산 ${man(D.total)} ≥ 기준 ${man(D.threshold)} · 장려금 ${won(D.amount)} · 사후 검토 ${won(D.prevExcess)} 등록`},
+ {s:'match', role:'영업팀', nav:1, label:`AI 관련자 판정 D-024 ${sc('D-024')}/3 · D-037 ${sc('D-037')}/3`, log:`AI 판정 · D-024 ${sc('D-024')}개 · D-037 ${sc('D-037')}개 일치 → 동일 관련자 그룹`},
+ {s:'calc', role:'영업팀', nav:1, label:'합산 한도 초과 · 요율 비교', log:`합산 ${won(D.amount)} > 한도 ${won(D.limit)} · 영업임원 승인 대상 · 사후 검토 ${won(D.prevPaid)} 등록`},
 ];
 const SCN = {
  1:[...base,
-  {s:'riskPass', role:'시스템', nav:1, label:'리스크 검사 통과', log:'리스크 검사 통과 · AWAITING_APPROVAL'},
+  {s:'riskPass', role:'시스템', nav:1, label:'보류 사유 없음 · 연체는 경고', log:'보류 사유 없음 · 연체 경고 · AI 권고 작성 · AWAITING_APPROVAL'},
   {s:'approve', o:{fin:'wait',aud:'wait',hot:'ok'}, role:'재무팀', nav:2, label:'재무팀 결재 팝업 → 승인', log:'재무팀에 결재 팝업 발송'},
   {s:'approve', o:{fin:'ok',aud:'wait',hot:'ok'}, role:'내부감시팀', nav:2, label:'내부감시팀 근거 확인 → 승인', log:'재무팀 승인 · 내부감시팀으로 이관'},
-  {s:'paid', role:'재무팀', nav:0, label:'현금 지급 완료', log:`내부감시팀 승인 · ${won(D.amount)} 지급 · PAID`},
+  {s:'approve', o:{fin:'ok',aud:'ok',hot:'ok'}, role:'영업임원', nav:2, label:'영업임원 최종 승인 (한도 초과 건)', log:'내부감시팀 승인 · 영업임원으로 이관'},
+  {s:'paid', role:'재무팀', nav:0, label:'현금 지급 완료', log:`영업임원 승인 · ${won(D.amount)} 지급 · PAID`},
  ],
  2:[...base,
-  {s:'riskFail', role:'시스템', nav:1, label:'90일 초과 연체 5건 감지', log:`그룹 90일 초과 연체 ${won(D.overdue)} 감지`},
-  {s:'hold', o:{hot:true}, role:'영업팀', nav:3, label:'자동 보류 · 영업/재무 경고', log:'자동 보류 · PENDING · 영업팀·재무팀 경고 · 상계안 생성'},
+  {s:'riskFail', role:'시스템', nav:1, label:"'악의적' 클레임 판정 3건 감지", log:"D-024 최근 6개월 '악의적' 판정 3건 감지"},
+  {s:'hold', o:{hot:true}, role:'영업팀', nav:3, label:'자동 보류 · 영업/품질 경고', log:'자동 보류 · PENDING · 영업팀·품질팀 경고 · 소명 스레드 생성'},
+  {s:'hold', o:{done:true}, role:'품질팀', nav:3, label:'영업 소명 → AI 검토 → 품질팀 해제', log:'영업팀 소명 제출 · AI 소명 검토 · 품질팀 해제 대기'},
  ],
  3:[...base,
-  {s:'riskPass', role:'시스템', nav:1, label:'리스크 검사 통과', log:'리스크 검사 통과 · AWAITING_APPROVAL'},
-  {s:'approve', o:{fin:'wait',aud:'wait',hot:'no',cash:'low'}, role:'재무팀', nav:2, label:'재무팀 결재 팝업 (Masil 약정 경고)', log:'재무팀에 결재 팝업 발송 · Masil 약정 여유 21.5억 경고'},
+  {s:'riskPass', role:'시스템', nav:1, label:'보류 사유 없음 · 연체는 경고', log:'보류 사유 없음 · 연체 경고 · AI 권고 작성 · AWAITING_APPROVAL'},
+  {s:'approve', o:{fin:'wait',aud:'wait',hot:'no'}, role:'재무팀', nav:2, label:'재무팀 결재 팝업 (현금·연체 경고)', log:'재무팀에 결재 팝업 발송 · Corevia 현금 감소·그룹 연체 경고'},
   {s:'reject', role:'재무팀', nav:2, label:'사유 CASH_SHORTAGE로 거절', log:'재무팀 거절 · 사유 CASH_SHORTAGE · REJECTED'},
-  {s:'alt', o:{s:false,f:false}, role:'영업팀', nav:3, label:'AI가 Masil 크레딧 대안 제안', log:'AI 대안 생성 · CH-04 크레딧 · ALT_PROPOSED'},
+  {s:'alt', o:{s:false,f:false}, role:'영업팀', nav:3, label:'AI가 Masil 크레딧 대안 제안', log:'AI 대안 생성 · CH-04 크레딧 · 더마 제외 판단 근거 기록 · ALT_PROPOSED'},
   {s:'alt', o:{s:true,f:false}, role:'재무팀', nav:3, label:'영업팀 수락 → 재무팀 수락', log:'영업팀 대안 수락'},
   {s:'credit', role:'재무팀', nav:0, label:'지급 계획 변경 완료', log:`재무팀 수락 · Masil 크레딧 ${won(D.amount)} 예약 · CREDIT_SCHEDULED`},
  ]
 };
 const NOTES = {
- 1:'정상 작동: 매칭(자동 + 수동 확정) → 실적 충족 → 재무·내부감시 승인 → 지급 완료. 연체 채권은 7월에 회수됐다고 가정합니다.',
- 2:'나만의 확장: 실적은 기준을 넘었지만, 실제 데이터에 있는 90일 초과 연체 채권 때문에 AI가 결재 전에 자동 보류하고 상계안을 냅니다.',
- 3:'다른 부서 영향: Masil 현금이 약정 하한에 다가가 재무팀이 현금 지급을 거절하자, AI가 Masil 재고 할인으로 대신 지급하는 안을 제안합니다.'
+ 1:'정상 작동: 동일 관련자 판정 → 합산 한도 초과 확인 → 재무·내부감시·영업임원 승인 → 지급 완료. 연체 채권은 보류하지 않고 결재 화면에 경고로 보여 줍니다.',
+ 2:"나만의 확장: 합산 한도를 넘어 결재 대상이 됐지만, 그룹 안 거래처에 '악의적' 클레임 판정이 3건 있어 AI가 결재 전에 자동 보류합니다. 판정 3건은 명세 예시를 넣은 시연용 입력입니다.",
+ 3:'다른 부서 영향: Corevia 현금이 줄고 이 그룹의 연체 채권이 밀려 있어 재무팀이 현금 지급을 거절하자, AI가 Masil 재고 할인으로 대신 지급하는 안을 제안합니다.'
 };
 
 let cur = 1, idx = 0;

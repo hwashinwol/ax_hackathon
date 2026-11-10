@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}품질 판정 · Corevia 장려금{% endblock %}
+{% block body %}
+<h1>품질팀 클레임 판정</h1>
+<p class="small">최근 {{ RULES.malicious_window_months }}개월 안에 '악의적' 판정이 {{ RULES.malicious_count }}건 이상인 거래처가 그룹에 있으면, 장려금 요청은 결재로 넘어가지 않고 자동 보류됩니다. 해제는 영업팀 소명 뒤 품질팀만 할 수 있습니다.</p>
+<div class="card dash"><span class="small">원천 파일 qc_claims_cv({{ qc_n }}건)에는 {% if has_field %}판정 필드가 있어 함께 집계합니다.{% else %}'악의적' 판정 필드가 없고, 클레임이 대리점이 아니라 고객({{ qc_customers|join(', ') }}) 단위로만 기록되어 있습니다. 그래서 대리점별 판정은 이 화면에서 품질팀이 직접 등록합니다.{% endif %}</span></div>
+
+{% if role != '품질팀' %}<div class="flash crit">판정 등록은 품질팀 역할만 할 수 있습니다. 오른쪽 위에서 역할을 바꾸세요.</div>{% endif %}
+<div class="grid2">
+  <form method="post" class="card">
+    <h2>판정 등록</h2>
+    <label class="small">대리점
+      <select name="agency_id" style="width:100%">
+        {% for a in agencies %}<option value="{{ a.agency_id }}" {{ 'selected' if a.agency_id=='D-024' }}>{{ a.agency_id }} {{ a.agency_name }} · {{ a.representative_name }}</option>{% endfor %}
+      </select></label>
+    <div class="grid2">
+      <label class="small">클레임 일자<input name="claim_date" value="{{ as_of }}" style="width:100%"></label>
+      <label class="small">클레임 유형<input name="claim_type" placeholder="예: 포장 파손" style="width:100%"></label>
+    </div>
+    <label class="small">판정 근거<input name="memo" style="width:100%" placeholder="품질팀 메모"></label>
+    <div class="row">
+      <button class="btn primary {{ 'mine' if role=='품질팀' }}">'악의적' 판정 등록</button>
+      <button class="btn" name="demo" value="1">시연용 예시 3건 등록</button>
+    </div>
+    <p class="small">'시연용 예시 3건'은 워크플로우 명세의 예시(포장 파손 · 성분 이상 · 변질 주장)를 선택한 대리점에 넣습니다. 실제 데이터가 아니라 시연용 입력으로 표시됩니다.</p>
+  </form>
+  <div class="card">
+    <h2>등록된 판정 {{ rows|length }}건</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>번호</th><th>대리점</th><th>일자</th><th>유형</th><th>출처</th></tr></thead>
+      <tbody>
+      {% for j in rows %}<tr><td class="mono">QJ-{{ '%04d'|format(j.id) }}</td><td>{{ j.agency_id }}</td><td class="mono">{{ j.claim_date }}</td><td>{{ j.claim_type }}</td><td><span class="pill {{ 'warn' if j.source=='시연용 입력' else 'neutral' }}">{{ j.source }}</span></td></tr>
+      {% else %}<tr><td colspan="5" class="small">등록된 판정이 없습니다.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</div>
+{% endblock %}

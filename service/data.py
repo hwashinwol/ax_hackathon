@@ -20,12 +20,15 @@ CORE_FILES = {
     "m_influencer_ms.csv": "Masil 인플루언서",
     "board_minutes.md": "이사회 회의록",
     "ext_news_quality_incident.md": "외부 품질 보도",
+    "approval_authority_policy.md": "의사결정 권한 · 판매장려금 지급 한도",
+    "data_dictionary.md": "공통 데이터 정의 · 동일 관련자 판정 기준",
 }
-# 워크플로우 명세에는 있지만 아직 제공되지 않은 파일. 들어오면 자동으로 사용한다.
+# 없어도 서비스는 돌지만, 있으면 Masil 현금 재전망과 크레딧 정산에 쓴다.
 SPEC_OPTIONAL = {
     "covenant_terms_ms.md": "Masil 대출 약정 조건 (없으면 fin_cash_daily_ms.covenant_min_krw 사용)",
     "lc0001_payment_term_notice.md": "LC-0001 결제조건 변경 공지 (없으면 회수율 추이로 대체)",
-    "sc_purchase_orders_ms.csv": "Masil 발주(PO) 내역 (없으면 채권 청구일로 다음 발주 추정)",
+    "sc_purchase_orders_ms.csv": "Masil 발주(PO) 내역 (없으면 크레딧 정산 대상 발주를 지정할 수 없음)",
+    "fin_ap_aging_ms.csv": "Masil 매입채무 (없으면 현금 재전망을 하지 않음)",
 }
 
 NUMERIC = {
@@ -37,6 +40,8 @@ NUMERIC = {
     "fin_cash_daily_ms.csv": ["opening_balance", "inflow_krw", "outflow_krw", "closing_balance", "covenant_min_krw"],
     "fin_ar_aging_ms.csv": ["amount_krw", "outstanding_krw", "aging_days"],
     "fin_collection_history_ms.csv": ["expected_amount_krw", "collected_amount_krw", "collection_rate_pct"],
+    "sc_purchase_orders_ms.csv": ["amount_krw"],
+    "fin_ap_aging_ms.csv": ["amount_krw"],
 }
 
 

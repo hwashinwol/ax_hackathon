@@ -3,15 +3,16 @@ import json
 import sqlite3
 from datetime import datetime
 
+import agent
 import engine
-from config import DB_PATH, REJECT_REASONS, RULES
+from config import APPROVAL_CHAIN, DB_PATH, REJECT_REASONS
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS requests(
   id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, anchor_id TEXT, period TEXT, memo TEXT,
   extra_ids TEXT, status TEXT, created_by TEXT, created_at TEXT,
   match_json TEXT, reviews_json TEXT, agg_json TEXT, risk_json TEXT, resolutions_json TEXT,
-  cash_json TEXT, alt_json TEXT, alt_accept_json TEXT, settlement TEXT);
+  cash_json TEXT, alt_json TEXT, alt_accept_json TEXT, ai_json TEXT);
 CREATE TABLE IF NOT EXISTS approvals(
   id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER, step INTEGER, role TEXT,
   decision TEXT, reason TEXT, memo TEXT, at TEXT);
@@ -25,6 +26,9 @@ CREATE TABLE IF NOT EXISTS credits(
 CREATE TABLE IF NOT EXISTS audit_log(
   id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER, actor TEXT, action TEXT,
   before TEXT, after TEXT, payload TEXT, at TEXT);
+CREATE TABLE IF NOT EXISTS claim_judgments(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, agency_id TEXT, claim_date TEXT, claim_type TEXT,
+  judgment TEXT, memo TEXT, source TEXT, by TEXT, at TEXT);
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_log BEGIN SELECT RAISE(ABORT,'audit_log is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABORT,'audit_log is append-only'); END;
 """
@@ -32,7 +36,7 @@ CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_log BEGIN SE
 # 허용되는 상태 전이
 TRANSITIONS = {
     "REQUESTED": {"MATCHING"},
-    "MATCHING": {"MANUAL_REVIEW", "NOT_ELIGIBLE", "RISK_CHECK"},
+    "MATCHING": {"MANUAL_REVIEW", "WITHIN_LIMIT", "RISK_CHECK"},
     "MANUAL_REVIEW": {"MATCHING"},
     "RISK_CHECK": {"PENDING", "AWAITING_APPROVAL"},
     "PENDING": {"RISK_CHECK", "CLOSED"},
@@ -69,9 +73,25 @@ def L(s, default=None):
 
 
 class Workflow:
-    def __init__(self, data, con):
+    def __init__(self, data, con, ai_client=None):
         self.d = data
         self.con = con
+        self.ai_client = ai_client      # 테스트에서 가짜 클라이언트를 넣는다. None이면 환경의 자격 증명으로 만든다.
+
+    def _ai(self, rid, task):
+        """AI 에이전트를 돌리고 결과·호출 내역을 요청과 감사 로그에 남긴다. LLM을 못 쓰면 None."""
+        res, err = agent.safe_run(self, rid, task, self.ai_client)
+        label = {"review": "결재 권고", "explain": "소명 검토", "alt": "대안 설명"}[task]
+        if res:
+            ai = self.get(rid)["ai"]
+            ai[task] = {**res["output"], "model": res["model"], "tools": [t["tool"] for t in res["trace"]], "at": now()}
+            self._set(rid, ai_json=J(ai))
+            self.audit(rid, "AI", f"AI 에이전트 실행 · {label}",
+                       payload={"model": res["model"], "tool_calls": res["trace"], "usage": res["usage"], "output": res["output"]})
+            return res["output"]
+        self.audit(rid, "AI", f"AI 에이전트 미실행 · {label}은 규칙 기반으로 대체",
+                   payload={"reason": err or "LLM 자격 증명 없음 또는 CV_AI=off"})
+        return None
 
     # ── 공통 ──
     def get(self, rid):
@@ -80,8 +100,9 @@ class Workflow:
             raise WorkflowError("요청을 찾을 수 없습니다.")
         r = dict(r)
         for k in ("extra_ids", "match_json", "reviews_json", "agg_json", "risk_json", "resolutions_json",
-                  "cash_json", "alt_json", "alt_accept_json"):
+                  "cash_json", "alt_json", "alt_accept_json", "ai_json"):
             r[k.replace("_json", "")] = L(r.pop(k), None)
+        r["ai"] = r["ai"] or {}
         r["resolutions"] = r["resolutions"] or {}
         r["reviews"] = r["reviews"] or {}
         r["alt_accept"] = r["alt_accept"] or {}
@@ -120,6 +141,27 @@ class Workflow:
             if c["decision"] == "auto" or r["reviews"].get(c["agency_id"], {}).get("decision") == "confirm":
                 ids.append(c["agency_id"])
         return ids
+
+    # ── 품질팀 클레임 판정 (원천 qc_claims_cv에 판정 필드와 대리점 연결이 없어 시스템에서 받는다) ──
+    def judgments(self):
+        return [dict(j) for j in self.con.execute("SELECT * FROM claim_judgments ORDER BY claim_date DESC, id DESC")]
+
+    def add_judgment(self, actor, agency_id, claim_date, claim_type, memo="", source="품질팀 입력"):
+        if actor != "품질팀":
+            raise WorkflowError("클레임 판정 등록은 품질팀만 할 수 있습니다.")
+        if not self.d.agency(agency_id):
+            raise WorkflowError("대리점을 찾을 수 없습니다.")
+        try:
+            datetime.strptime(claim_date, "%Y-%m-%d")
+        except ValueError:
+            raise WorkflowError("클레임 일자는 YYYY-MM-DD 형식으로 입력하세요.")
+        if not claim_type.strip():
+            raise WorkflowError("클레임 유형을 입력하세요.")
+        self.con.execute("INSERT INTO claim_judgments(agency_id,claim_date,claim_type,judgment,memo,source,by,at) VALUES(?,?,?,?,?,?,?,?)",
+                         (agency_id, claim_date, claim_type.strip(), "악의적", memo, source, actor, now()))
+        self.audit(None, actor, f"클레임 '악의적' 판정 등록 · {agency_id}",
+                   payload={"claim_date": claim_date, "claim_type": claim_type, "memo": memo, "source": source})
+        self.con.commit()
 
     # ── 단계별 액션 ──
     def create(self, actor, anchor_id, period, extra_ids=(), memo=""):
@@ -166,36 +208,39 @@ class Workflow:
         self.con.commit()
 
     def evaluate(self, rid, actor):
-        """그룹 확정 → 실적 합산 → (충족 시) 리스크 검사."""
+        """그룹 확정 → 관련자 합산 장려금을 월 한도와 비교 → (초과 시) 리스크 검사·임원 결재선."""
         r = self.get(rid)
         self._need(r, "MATCHING", "영업팀", actor)
         members = self.members(r)
         agg = engine.aggregate(self.d, members, r["period"])
         self._set(rid, agg_json=J(agg))
-        self.audit(rid, "AI", "실적 합산·요율 계산", payload={"members": members, "total": agg["total_sales"],
-                                                            "threshold": agg["threshold"], "amount": agg["amount"],
+        self.audit(rid, "AI", "관련자 합산·한도 비교", payload={"members": members, "amount": agg["amount"],
+                                                            "limit": agg["limit"], "monthly": agg["monthly"],
                                                             "rate": round(agg["rate"], 4), "std_mean": round(agg["std_mean"], 4)})
-        if agg["prior_excess"] > 0:
-            self.notify(rid, ["내부감시팀"], f"{r['code']} · 과거 우대 요율 초과 지급분 {agg['prior_excess']:,}원 사후 검토 대상", "warn")
-            self.audit(rid, "AI", "사후 검토 등록", payload={"prior_paid": agg["prior_paid"], "prior_excess": agg["prior_excess"]})
-        if not agg["meets"]:
-            self.move(rid, "AI", "NOT_ELIGIBLE", "합산 실적 기준 미달", {"total": agg["total_sales"], "threshold": agg["threshold"]})
-            self.notify(rid, ["영업팀"], f"{r['code']} · 합산 실적 기준 미달로 종결")
+        if agg["prior_over"]:
+            self.notify(rid, ["내부감시팀"],
+                        f"{r['code']} · 과거 {len(agg['prior_over'])}개월 합산 한도 초과 지급 {agg['prior_over_amount']:,}원 "
+                        f"(결재 {agg['prior_approver']} 단독) 사후 검토 대상", "warn")
+            self.audit(rid, "AI", "사후 검토 등록", payload={"prior_over": agg["prior_over"], "prior_paid": agg["prior_paid"],
+                                                          "rate_excess": agg["prior_excess"]})
+        if not agg["over_limit"]:
+            self.move(rid, "AI", "WITHIN_LIMIT", "합산 한도 이하 · 영업지원팀 전결 범위", {"amount": agg["amount"], "limit": agg["limit"]})
+            self.notify(rid, ["영업팀"], f"{r['code']} · 관련자 합산 {agg['amount']:,}원, 월 한도 이하라 영업지원팀 전결로 처리")
         else:
-            self.move(rid, "AI", "RISK_CHECK", "합산 실적 기준 충족")
+            self.move(rid, "AI", "RISK_CHECK", "합산 한도 초과 · 영업임원 승인 대상", {"amount": agg["amount"], "limit": agg["limit"]})
             self._run_risk(rid)
         self.con.commit()
 
     def _run_risk(self, rid):
         r = self.get(rid)
         members = self.members(r)
-        rk = engine.risk(self.d, members, r["period"], r["agg"], r["resolutions"])
+        rk = engine.risk(self.d, members, r["period"], r["agg"], r["resolutions"], self.judgments())
         cash = engine.cash(self.d)
         self._set(rid, risk_json=J(rk), cash_json=J(cash))
         if rk["blocking"]:
             self.move(rid, "AI", "PENDING", "리스크 감지 · 자동 보류", {"hold": rk["hold"]})
             roles = {"영업팀"}
-            if "overdue" in rk["hold"] or "eligible" in rk["hold"]:
+            if "eligible" in rk["hold"]:
                 roles.add("재무팀")
             if "malicious" in rk["hold"]:
                 roles.add("품질팀")
@@ -204,8 +249,11 @@ class Workflow:
             self.con.execute("INSERT INTO threads(request_id,role,kind,body,at) VALUES(?,?,?,?,?)",
                              (rid, "AI", "system", "보류 사유: " + ", ".join(labels) + ". 영업팀 소명 후 담당 부서가 해제해야 결재가 재개됩니다.", now()))
         else:
-            self.move(rid, "AI", "AWAITING_APPROVAL", "리스크 없음 · 결재 요청", {"checks": {c["key"]: c["result"] for c in rk["checks"]}})
-            self.notify(rid, ["재무팀"], f"{r['code']} · 장려금 {r['agg']['amount']:,}원 결재 요청 (1차)")
+            self.move(rid, "AI", "AWAITING_APPROVAL", "보류 사유 없음 · 결재 요청", {"checks": {c["key"]: c["result"] for c in rk["checks"]}})
+            warn = [c["label"] for c in rk["checks"] if c["key"] == "overdue" and c["result"] == "warn"]
+            self.notify(rid, [APPROVAL_CHAIN[0]], f"{r['code']} · 장려금 {r['agg']['amount']:,}원 결재 요청 (1차)"
+                        + (f" · 경고: {warn[0]}" if warn else ""), "warn" if warn else "info")
+            self._ai(rid, "review")
 
     def explain(self, rid, actor, body):
         r = self.get(rid)
@@ -214,24 +262,31 @@ class Workflow:
             raise WorkflowError("소명 내용을 입력하세요.")
         self.con.execute("INSERT INTO threads(request_id,role,kind,body,at) VALUES(?,?,?,?,?)", (rid, actor, "explain", body, now()))
         self.audit(rid, actor, "소명 제출", payload={"body": body})
-        self.notify(rid, ["재무팀", "품질팀"], f"{r['code']} · {actor} 소명 제출")
+        owners = sorted({"malicious": "품질팀", "eligible": "재무팀"}[h] for h in r["risk"]["hold"])
+        self.notify(rid, owners, f"{r['code']} · {actor} 소명 제출")
+        out = self._ai(rid, "explain")
+        if out:
+            body = ("AI 소명 검토: " + out["assessment"]
+                    + (" 추가로 필요한 것: " + "; ".join(out["missing"]) if out["missing"] else "")
+                    + " (해제 여부는 담당 부서가 결정합니다)")
+            self.con.execute("INSERT INTO threads(request_id,role,kind,body,at) VALUES(?,?,?,?,?)", (rid, "AI", "system", body, now()))
         self.con.commit()
 
     def resolve(self, rid, actor, key, kind, memo=""):
-        """보류 해제: overdue(재무팀: 회수 확인/상계), malicious(품질팀: 해제)"""
+        """보류 해제: malicious(품질팀 해제), eligible(재무팀 확인)"""
         r = self.get(rid)
-        owner = {"overdue": "재무팀", "malicious": "품질팀", "eligible": "재무팀"}[key]
+        owner = {"malicious": "품질팀", "eligible": "재무팀"}.get(key)
+        if not owner:
+            raise WorkflowError("해제할 수 있는 보류 사유가 아닙니다.")
         self._need(r, "PENDING", owner, actor)
         if key not in r["risk"]["hold"]:
             raise WorkflowError("해당 보류 사유가 없습니다.")
         has_explain = self.con.execute("SELECT 1 FROM threads WHERE request_id=? AND kind='explain' AND role='영업팀'", (rid,)).fetchone()
         if not has_explain:
             raise WorkflowError("영업팀 소명이 먼저 제출되어야 해제할 수 있습니다.")
-        labels = {"collected": "회수 확인", "offset": "장려금 상계", "released": "품질팀 해제"}
+        labels = {"released": "품질팀 해제", "confirmed": "재무팀 확인"}
         r["resolutions"][key] = {"kind": kind, "label": labels.get(kind, kind), "memo": memo, "by": actor, "at": now()}
         self._set(rid, resolutions_json=J(r["resolutions"]))
-        if kind == "offset":
-            self._set(rid, settlement="OFFSET")
         self.audit(rid, actor, f"보류 해제 · {labels.get(kind, kind)}", payload={"key": key, "memo": memo})
         remaining = [h for h in r["risk"]["hold"] if h not in r["resolutions"]]
         if not remaining:
@@ -246,21 +301,25 @@ class Workflow:
         self.notify(rid, ["영업팀"], f"{r['code']} · 소명 기각으로 종결", "crit")
         self.con.commit()
 
+    def next_approver(self, rid):
+        done = [a["role"] for a in self.con.execute("SELECT role FROM approvals WHERE request_id=? AND decision='approve'", (rid,))]
+        return next((x for x in APPROVAL_CHAIN if x not in done), APPROVAL_CHAIN[-1])
+
     def approve(self, rid, actor, memo=""):
         r = self.get(rid)
-        self._need(r, "AWAITING_APPROVAL", ["재무팀", "내부감시팀"], actor)
-        done = [a["role"] for a in self.con.execute("SELECT role FROM approvals WHERE request_id=? AND decision='approve'", (rid,))]
-        need = "재무팀" if "재무팀" not in done else "내부감시팀"
+        self._need(r, "AWAITING_APPROVAL", APPROVAL_CHAIN, actor)
+        need = self.next_approver(rid)
         if actor != need:
             raise WorkflowError(f"지금은 {need} 결재 차례입니다.")
-        step = 1 if need == "재무팀" else 2
+        step = APPROVAL_CHAIN.index(need) + 1
         self.con.execute("INSERT INTO approvals(request_id,step,role,decision,memo,at) VALUES(?,?,?,?,?,?)",
                          (rid, step, actor, "approve", memo, now()))
         self.audit(rid, actor, f"{step}차 결재 승인", payload={"memo": memo})
-        if step == 1:
-            self.notify(rid, ["내부감시팀"], f"{r['code']} · 재무팀 승인, 2차 결재 요청")
+        if step < len(APPROVAL_CHAIN):
+            nxt = APPROVAL_CHAIN[step]
+            self.notify(rid, [nxt], f"{r['code']} · {actor} 승인, {step + 1}차 결재 요청")
         else:
-            how = "연체 채권 상계" if r["settlement"] == "OFFSET" else "현금 지급"
+            how = "현금 지급"
             pays = [{"rebate_ids": m["rebate_ids"], "agency_id": m["agency_id"], "amount": m["rebate"], "account": m["account"]}
                     for m in r["agg"]["members"]]
             self.move(rid, actor, "PAID", f"지급 완료 · {how}", {"payments": pays, "settlement": how})
@@ -269,10 +328,10 @@ class Workflow:
 
     def reject(self, rid, actor, reason, memo=""):
         r = self.get(rid)
-        self._need(r, "AWAITING_APPROVAL", ["재무팀", "내부감시팀"], actor)
+        self._need(r, "AWAITING_APPROVAL", APPROVAL_CHAIN, actor)
         if reason not in REJECT_REASONS:
             raise WorkflowError("거절 사유 코드를 선택하세요.")
-        step = 1 if actor == "재무팀" else 2
+        step = APPROVAL_CHAIN.index(actor) + 1
         self.con.execute("INSERT INTO approvals(request_id,step,role,decision,reason,memo,at) VALUES(?,?,?,?,?,?,?)",
                          (rid, step, actor, "reject", reason, memo, now()))
         self.move(rid, actor, "REJECTED", f"결재 거절 · {reason}", {"memo": memo})
@@ -280,8 +339,12 @@ class Workflow:
             alt = engine.alternative(self.d, r["agg"]["amount"], self.members(r), r["cash"] or engine.cash(self.d))
             self._set(rid, alt_json=J(alt), alt_accept_json=J({"plan": "full"}))
             self.move(rid, "AI", "ALT_PROPOSED", "AI 대안 제안 · Masil 크레딧",
-                      {"credit": alt["credit"], "channel": alt["channel"].get("channel_id"), "masil_impact_pct": alt["masil_impact_pct"]})
+                      {"credit": alt["credit"], "channel": alt["channel"].get("channel_id"),
+                       "skus_ok": alt["skus_ok"], "skus_excluded": alt["skus_excluded"],
+                       "exclusion_basis": alt["exclusion_basis"],          # 품목 제외 판단 근거
+                       "settlement": {k: v for k, v in (alt["settlement"] or {}).items() if k != "rows"}})
             self.notify(rid, ["영업팀", "재무팀"], f"{r['code']} · 현금 거절, Masil 재고 할인 대체안 검토 요청", "warn")
+            self._ai(rid, "alt")
         else:
             self.move(rid, "AI", "CLOSED", "거절 종결")
             self.notify(rid, ["영업팀"], f"{r['code']} · {actor} 거절({reason})로 종결", "crit")

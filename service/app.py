@@ -5,24 +5,26 @@ import os
 
 from flask import Flask, Response, flash, g, redirect, render_template, request, url_for
 
+import agent
 import engine
-from config import DATA_DIR, DB_PATH, REJECT_REASONS, ROLES, RULES
+from config import AI_MODEL, APPROVAL_CHAIN, DATA_DIR, DB_PATH, REJECT_REASONS, ROLES, RULES, RULE_SOURCES
 from data import Data
 from workflow import Workflow, WorkflowError, connect, L
 
 STATUS_STYLE = {
-    "REQUESTED": "neutral", "MATCHING": "info", "MANUAL_REVIEW": "warn", "NOT_ELIGIBLE": "neutral",
+    "REQUESTED": "neutral", "MATCHING": "info", "MANUAL_REVIEW": "warn", "WITHIN_LIMIT": "neutral",
     "RISK_CHECK": "info", "PENDING": "warn", "AWAITING_APPROVAL": "info", "PAID": "ok", "REJECTED": "crit",
     "ALT_PROPOSED": "info", "CREDIT_SCHEDULED": "info", "CREDIT_SETTLED": "ok", "CLOSED": "neutral",
 }
 STEPS = ["REQUESTED", "MATCHING", "RISK_CHECK", "AWAITING_APPROVAL", "처리"]
 
 
-def create_app(data_dir=DATA_DIR, db_path=DB_PATH):
+def create_app(data_dir=DATA_DIR, db_path=DB_PATH, ai_client=None):
     app = Flask(__name__)
     app.secret_key = os.environ.get("CV_SECRET", "corevia-demo")
     app.config["DATA"] = Data(data_dir)
     app.config["DB_PATH"] = db_path
+    app.config["AI_CLIENT"] = ai_client     # 테스트용 주입. 평소에는 None(환경의 자격 증명 사용)
 
     @app.template_filter("won")
     def won(n):
@@ -43,7 +45,7 @@ def create_app(data_dir=DATA_DIR, db_path=DB_PATH):
     def wf():
         if "wf" not in g:
             g.con = connect(app.config["DB_PATH"])
-            g.wf = Workflow(app.config["DATA"], g.con)
+            g.wf = Workflow(app.config["DATA"], g.con, app.config["AI_CLIENT"])
         return g.wf
 
     @app.teardown_appcontext
@@ -61,7 +63,8 @@ def create_app(data_dir=DATA_DIR, db_path=DB_PATH):
         w = wf()
         unread = w.con.execute("SELECT COUNT(*) FROM notices WHERE to_role=? AND read=0", (role(),)).fetchone()[0]
         return {"role": role(), "roles": ROLES, "unread": unread, "S": STATUS_STYLE, "as_of": app.config["DATA"].as_of,
-                "RULES": RULES}
+                "RULES": RULES, "SRC": RULE_SOURCES, "ai_model": AI_MODEL,
+                "ai_on": bool(app.config["AI_CLIENT"]) or agent.available()}
 
     def act(fn, rid, *args):
         try:
@@ -126,10 +129,18 @@ def create_app(data_dir=DATA_DIR, db_path=DB_PATH):
         threads = [dict(t) for t in w.con.execute("SELECT * FROM threads WHERE request_id=? ORDER BY id", (rid,))]
         credit = w.con.execute("SELECT * FROM credits WHERE request_id=?", (rid,)).fetchone()
         audit = [dict(a) for a in w.con.execute("SELECT * FROM audit_log WHERE request_id=? ORDER BY id DESC", (rid,))]
-        done = [a["role"] for a in approvals if a["decision"] == "approve"]
-        return render_template("detail.html", r=r, members=members, approvals=approvals, threads=threads,
+        rec = None
+        if r["status"] == "AWAITING_APPROVAL" and r["agg"] and r["risk"]:
+            ai = r["ai"].get("review")
+            if ai:      # Claude가 쓴 권고
+                rec = {"title": ai["title"], "text": ai["summary"], "reasons": ai["reasons"], "ask_sales": ai["ask_sales"],
+                       "source": f"Claude · {ai['model']}", "tools": ai.get("tools", [])}
+            else:       # LLM 미연결 시 규칙 기반 문구
+                rec = engine.recommend(r["match"], members, r["agg"], r["risk"], r["cash"])
+                rec["source"] = "규칙 기반 (AI 에이전트 미연결)"
+        return render_template("detail.html", r=r, members=members, approvals=approvals, threads=threads, rec=rec,
                                credit=dict(credit) if credit else None, audit=audit,
-                               next_approver=("재무팀" if "재무팀" not in done else "내부감시팀"),
+                               next_approver=w.next_approver(rid), chain=APPROVAL_CHAIN,
                                reasons=REJECT_REASONS, anchor=app.config["DATA"].agency(r["anchor_id"]))
 
     # ── 액션 ──
@@ -180,6 +191,32 @@ def create_app(data_dir=DATA_DIR, db_path=DB_PATH):
     @app.post("/requests/<int:rid>/credit/settle")
     def do_settle(rid):
         return act(wf().settle_credit, rid, request.form.get("po", ""))
+
+    # 명세 시나리오 2의 예시 클레임 3건. 원천 데이터에 없는 값이라 '시연용 입력'으로 표시해 넣는다.
+    DEMO_CLAIMS = [("2026-02-10", "포장 파손"), ("2026-04-03", "성분 이상"), ("2026-05-21", "변질 주장")]
+
+    @app.route("/quality", methods=["GET", "POST"])
+    def quality():
+        w, d = wf(), app.config["DATA"]
+        if request.method == "POST":
+            try:
+                aid = request.form.get("agency_id", "")
+                if request.form.get("demo"):
+                    for day, kind in DEMO_CLAIMS:
+                        w.add_judgment(role(), aid, day, kind, "명세 시나리오 2 예시", "시연용 입력")
+                    flash(f"{aid}에 시연용 '악의적' 판정 {len(DEMO_CLAIMS)}건을 등록했습니다.", "ok")
+                else:
+                    w.add_judgment(role(), aid, request.form.get("claim_date", ""), request.form.get("claim_type", ""),
+                                   request.form.get("memo", ""))
+                    flash(f"{aid} 클레임 판정을 등록했습니다.", "ok")
+            except WorkflowError as e:
+                w.con.rollback()
+                flash(str(e), "crit")
+            return redirect(url_for("quality"))
+        qc = d.t("qc_claims_cv.csv")
+        return render_template("quality.html", rows=w.judgments(), agencies=d.t("m_agency_cv.csv").to_dict("records"),
+                               qc_n=len(qc), qc_customers=sorted(qc.customer_id.unique()) if len(qc) else [],
+                               has_field="internal_judgment" in qc.columns)
 
     @app.get("/notices")
     def notices():
