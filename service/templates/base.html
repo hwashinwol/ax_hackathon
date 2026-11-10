@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Corevia 장려금 결재{% endblock %}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="top">
+  <span class="brand">Corevia · 관련 거래처 장려금 결재<small>데이터 기준일 {{ as_of }}</small></span>
+  <nav>
+    {% set ep = request.endpoint %}
+    <a href="{{ url_for('inbox') }}" class="{{ 'on' if ep in ('inbox','detail') }}">요청함</a>
+    <a href="{{ url_for('new') }}" class="{{ 'on' if ep=='new' }}">새 요청</a>
+    <a href="{{ url_for('notices') }}" class="{{ 'on' if ep=='notices' }}">알림{% if unread %}<span class="badge">{{ unread }}</span>{% endif %}</a>
+    <a href="{{ url_for('audit') }}" class="{{ 'on' if ep=='audit' }}">감사 로그</a>
+    <a href="{{ url_for('data_page') }}" class="{{ 'on' if ep=='data_page' }}">데이터 연결</a>
+  </nav>
+  <form method="post" action="{{ url_for('set_role') }}" class="rolebox">
+    접속 역할
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <select name="role" onchange="this.form.submit()" aria-label="접속 역할">
+      {% for r in roles %}<option {{ 'selected' if r==role }}>{{ r }}</option>{% endfor %}
+    </select>
+  </form>
+</header>
+<main>
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+  {% block body %}{% endblock %}
+</main>
+</body>
+</html>

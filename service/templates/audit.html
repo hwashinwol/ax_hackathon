@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="row between"><h1>감사 로그</h1><a class="btn" href="{{ url_for('audit', format='csv') }}">CSV 내보내기</a></div>
+<p class="small">모든 상태 변경과 판단 근거를 기록합니다. 데이터베이스 트리거로 수정·삭제를 막아 두었습니다(이사회 지침: 결정 근거 기록).</p>
+<div class="tbl"><table>
+  <thead><tr><th>#</th><th>시각</th><th>요청</th><th>주체</th><th>행위</th><th>상태</th><th>근거(payload)</th></tr></thead>
+  <tbody>
+  {% for a in rows %}
+    <tr><td class="mono">{{ a.id }}</td><td class="mono small">{{ a.at }}</td>
+      <td class="mono"><a href="{{ url_for('detail', rid=a.request_id) }}">{{ a.code }}</a></td>
+      <td>{{ a.actor }}</td><td>{{ a.action }}</td>
+      <td class="mono small">{{ a.before or '' }}{{ '→' if a.after }}{{ a.after or '' }}</td>
+      <td class="mono small" style="max-width:380px;word-break:break-all">{{ a.payload if a.payload != '{}' }}</td></tr>
+  {% else %}<tr><td colspan="7" class="small">기록이 없습니다.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

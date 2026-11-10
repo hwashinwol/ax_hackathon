@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>새 장려금 요청</h1>
+{% if role != '영업팀' %}<div class="flash crit">요청 생성은 영업팀 역할만 할 수 있습니다. 오른쪽 위에서 역할을 바꾸세요.</div>{% endif %}
+<form method="post" class="card">
+  <div class="grid2">
+    <label class="small">기준 거래처
+      <select name="anchor_id" style="width:100%">
+        {% for a in agencies %}<option value="{{ a.agency_id }}" {{ 'selected' if a.agency_id=='D-011' }}>{{ a.agency_id }} {{ a.agency_name }} · {{ a.representative_name }} · {{ a.business_reg_no }}{{ ' · 장려금 대상 아님' if a.rebate_eligible!='True' }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="small">정산 기간
+      <select name="period" style="width:100%">
+        {% for m in months|reverse %}<option value="{{ m }}">{{ m }} (월)</option>{% endfor %}
+        {% for q in quarters|reverse %}<option value="{{ q }}">{{ q }} (분기)</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <label class="small">관련 거래처 후보 (선택, 쉼표로 구분 · 예: D-024,D-037)
+    <input name="extra_ids" style="width:100%" placeholder="AI가 마스터·수금 이력에서 자동으로도 찾습니다">
+  </label>
+  <label class="small">요청 사유<textarea name="memo">같은 대표가 운영하는 관련 거래처의 합산 실적 기준으로 장려금 지급을 요청합니다.</textarea></label>
+  <div class="row"><button class="btn primary">요청 생성</button><span class="small">생성 후 상세 화면에서 'AI 관련 거래처 매칭'을 실행합니다.</span></div>
+</form>
+<p class="small">월 합산 기준선 {{ RULES.threshold_monthly|won }} <span class="tbd">예시 · 입력 예정</span> (분기는 ×3)</p>
+{% endblock %}

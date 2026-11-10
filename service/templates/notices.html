@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>알림 · {{ role }}</h1>
+<div class="tbl"><table>
+  <thead><tr><th>시각</th><th>요청</th><th>내용</th></tr></thead>
+  <tbody>
+  {% for n in rows %}
+    <tr><td class="mono small">{{ n.at }}</td>
+      <td class="mono"><a href="{{ url_for('detail', rid=n.request_id) }}">{{ n.code }}</a></td>
+      <td><span class="pill {{ n.level if n.level in ('ok','warn','crit') else 'info' }}">{{ '새 알림' if not n.read else '읽음' }}</span> {{ n.text }}</td></tr>
+  {% else %}<tr><td colspan="3" class="small">알림이 없습니다.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

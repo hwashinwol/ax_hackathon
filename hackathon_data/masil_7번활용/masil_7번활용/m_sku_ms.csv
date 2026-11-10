@@ -1,0 +1,15 @@
+sku_id|sku_name|category|product_id|source_company|safety_stock_weeks_min|safety_stock_weeks_max|moq|lead_time_weeks
+SKU-1001|더마 리페어 세럼|더마|PL-02|Corevia|4|6|24000|12
+SKU-1002|더마 카밍 크림|더마|PL-02|Corevia|4|6|24000|12
+SKU-1003|더마 배리어 로션|더마|PL-02|Corevia|4|6|20000|12
+SKU-1004|더마 시카 앰플|더마|PL-02|Corevia|4|6|20000|12
+SKU-2001|기초 토너 대용량|기초|PL-01|Corevia|4|6|16000|8
+SKU-2002|기초 에센스|기초|PL-01|Corevia|4|6|16000|8
+SKU-2003|기초 수분크림|기초|PL-01|Corevia|4|6|16000|8
+SKU-3001|색조 벨벳 립|색조|PL-04|Corevia|4|6|12000|6
+SKU-3002|색조 글로우 쿠션|색조|PL-04|Corevia|4|6|12000|6
+SKU-3003|색조 아이팔레트|색조|PL-04|Corevia|4|6|10000|6
+SKU-4001|선케어 데일리 선스틱|선케어|PL-03|Corevia|4|6|12000|8
+SKU-4002|선케어 톤업 선크림|선케어|PL-03|Corevia|4|6|12000|8
+SKU-5001|헤어 리페어 샴푸|헤어|PL-05|Corevia|4|6|16000|8
+SKU-5002|바디 모이스처 워시|바디|PL-06|Corevia|4|6|16000|8

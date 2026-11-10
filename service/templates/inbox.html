@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="row between">
+  <h1>장려금 요청함</h1>
+  <div class="row">
+    {% if role == '영업팀' %}<a class="btn primary" href="{{ url_for('new') }}">+ 새 요청</a>{% endif %}
+    <form method="post" action="{{ url_for('reset') }}" class="inline" onsubmit="return confirm('시연용 요청·결재·로그를 모두 지웁니다. 계속할까요?')"><button class="btn">시연 초기화</button></form>
+  </div>
+</div>
+
+<div class="card">
+  <h2>원천 장려금 현황 <span class="small">sales_rebate_payment_cv</span></h2>
+  <div class="row">
+    <span class="pill info">전체 {{ n_src }}건</span>
+    {% for k, v in src.items() %}<span class="pill {{ 'ok' if k=='승인' else 'crit' if k=='반려' else 'neutral' }}">{{ k }} {{ v }}</span>{% endfor %}
+    <span class="small">· {{ last }} 미지급 {{ pending_n }}건 {{ pending_sum|won }} · 현행 결재자 {% for k, v in approvers.items() %}{{ k }} {{ v }}건{% endfor %} (단독)</span>
+  </div>
+</div>
+
+<div class="row">
+  <a class="pill {{ 'info' if not f else 'neutral' }}" href="{{ url_for('inbox') }}">전체 {{ counts.values()|sum }}</a>
+  {% for st, n in counts.items() %}<a class="pill {{ S[st] }}" href="{{ url_for('inbox', status=st) }}">{{ st }} {{ n }}</a>{% endfor %}
+</div>
+
+<div class="tbl">
+<table>
+  <thead><tr><th>요청번호</th><th>기준 거래처</th><th>정산 기간</th><th>그룹</th><th class="num">장려금</th><th>상태</th><th>생성</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td class="mono"><a href="{{ url_for('detail', rid=r.id) }}">{{ r.code }}</a></td>
+      <td>{{ r.anchor_id }}</td><td class="mono">{{ r.period }}</td>
+      <td>{{ r.n_members }}곳</td>
+      <td class="num">{{ r.amount|won if r.amount is not none else '-' }}</td>
+      <td><span class="pill {{ S[r.status] }}">{{ r.status }}</span></td>
+      <td class="small mono">{{ r.created_at }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="small">요청이 없습니다. 영업팀 역할로 '새 요청'을 만들어 시작하세요.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

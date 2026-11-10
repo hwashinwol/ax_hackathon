@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>데이터 연결</h1>
+<p class="small">원천 폴더: <span class="mono">{{ root }}</span> (하위 폴더 포함 전체 스캔 · 구분자 <span class="mono">|</span> · UTF-8). 파일을 바꾸면 서버를 다시 시작하세요.</p>
+<div class="tbl"><table>
+  <thead><tr><th>파일</th><th>용도</th><th>상태</th><th class="num">행</th><th>컬럼</th></tr></thead>
+  <tbody>
+  {% for f in inv %}
+  <tr><td class="mono">{{ f.name }}<br><span class="small">{{ f.path }}</span></td><td>{{ f.desc }}</td>
+    <td>{% if f.found %}<span class="pill ok">연결됨</span>{% elif f.optional %}<span class="pill warn">명세 파일 미제공</span>{% else %}<span class="pill crit">없음</span>{% endif %}</td>
+    <td class="num">{{ f.rows if f.rows is not none else '문서' if f.found else '-' }}</td>
+    <td class="small mono" style="max-width:360px">{{ f.cols|join(', ') }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if extra %}<p class="small">그 밖에 발견한 파일: {{ extra|join(', ') }}</p>{% endif %}
+
+<div class="grid2">
+  <div class="card">
+    <h2>판단 규칙 파라미터 <span class="tbd">입력 예정 · config.py</span></h2>
+    <dl class="kv">
+      <dt>매칭 가중치</dt><dd>자금 연결 {{ RULES.w_account_same }}(교차 입금 {{ RULES.w_cross_deposit }}) · 대표자명 {{ RULES.w_name }} · 주소 {{ RULES.w_addr_exact }}(같은 시 {{ RULES.w_addr_city }})</dd>
+      <dt>매칭 구간</dt><dd>≥{{ RULES.auto_group }} 자동 · ≥{{ RULES.manual_review }} 수동 검토</dd>
+      <dt>합산 기준선</dt><dd>월 {{ RULES.threshold_monthly|won }}</dd>
+      <dt>연체 보류</dt><dd>{{ RULES.overdue_days }}일 초과</dd>
+      <dt>악성 클레임</dt><dd>최근 {{ RULES.malicious_window_months }}개월 {{ RULES.malicious_count }}회 이상 (internal_judgment 필드 필요)</dd>
+      <dt>크레딧</dt><dd>장려금 {{ (RULES.credit_ratio*100)|int }}% · {{ RULES.credit_valid_days }}일 · 분할 시 현금 {{ (RULES.split_cash_ratio*100)|int }}%</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h2>그룹 현금 요약</h2>
+    <dl class="kv">
+      <dt>Corevia</dt><dd class="mono">{{ cash.cv_close|eok }} (최근 월 {{ cash.cv_month_net|eok }})</dd>
+      <dt>Masil</dt><dd class="mono">{{ cash.ms_close|eok }} · 하한 {{ cash.covenant|eok }} · 여유 {{ cash.headroom|eok }}</dd>
+      <dt>Masil 추세</dt><dd class="mono">{% for k, v in cash.ms_series %}{{ k[2:] }} {{ v|eok }}{{ ' · ' if not loop.last }}{% endfor %}</dd>
+      <dt>하한 도달 추정</dt><dd class="mono">{{ cash.breach_date or '-' }}</dd>
+    </dl>
+  </div>
+</div>
+{% endblock %}

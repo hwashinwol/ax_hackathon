@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}{{ r.code }} · Corevia 장려금{% endblock %}
+{% block body %}
+{% set st = r.status %}
+{% set stage = {'REQUESTED':0,'MATCHING':1,'MANUAL_REVIEW':1,'NOT_ELIGIBLE':2,'RISK_CHECK':2,'PENDING':2,'AWAITING_APPROVAL':3}.get(st, 4) %}
+<div class="row between">
+  <div><span class="small mono">{{ r.code }}</span><h1>{{ anchor.agency_name }} 외 관련 거래처 장려금 · {{ r.period }}</h1></div>
+  <span class="pill {{ S[st] }}" style="font-size:.9rem">{{ st }}</span>
+</div>
+<div class="stepper">
+  {% for label in ['① 요청','② AI 거래처 매칭','③ 실적·리스크 검증','④ 재무·내부감시 결재','⑤ 처리'] %}
+  <div class="{{ 'cur' if loop.index0==stage else 'done' if loop.index0<stage }}">{{ label }}</div>
+  {% endfor %}
+</div>
+
+<div class="layout">
+<div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+
+  <div class="card">
+    <dl class="kv">
+      <dt>기준 거래처</dt><dd>{{ anchor.agency_id }} {{ anchor.agency_name }} · 대표 {{ anchor.representative_name }} · {{ anchor.business_reg_no }}</dd>
+      <dt>요청 사유</dt><dd>{{ r.memo or '-' }}</dd>
+      <dt>요청자</dt><dd>{{ r.created_by }} · {{ r.created_at }}</dd>
+      {% if r.extra_ids %}<dt>영업 입력 후보</dt><dd>{{ r.extra_ids|join(', ') }}</dd>{% endif %}
+    </dl>
+    {% if st == 'REQUESTED' %}
+    <form method="post" action="{{ url_for('do_match', rid=r.id) }}" class="row">
+      <button class="btn primary {{ 'mine' if role=='영업팀' }}">AI 관련 거래처 매칭 실행</button>
+      <span class="small">m_agency_cv(대표자·주소·정산계좌) + fin_collection_history_cv(실제 입금 계좌) 대조</span>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if r.match %}
+  {% set m = r.match %}
+  <div class="card ai">
+    <span class="ai-tag">AI 판단 · 관련 거래처 매칭</span>
+    {% if m.candidates %}
+      <p>{{ anchor.agency_id }}와(과) 동일 지배구조로 보이는 거래처 {{ m.candidates|length }}곳을 찾았습니다.
+      {% for c in m.candidates %}<b>{{ c.agency_id }} {{ c.score }}점</b>({{ {'auto':'자동 그룹','review':'수동 검토','none':'미그룹'}[c.decision] }}){{ ', ' if not loop.last }}{% endfor %}.
+      자동 그룹 {{ RULES.auto_group }}점 이상 · 수동 검토 {{ RULES.manual_review }}~{{ RULES.auto_group-1 }}점 <span class="tbd">입력 예정</span></p>
+    {% else %}
+      <p>관련 거래처를 찾지 못했습니다. {{ anchor.agency_id }} 단독 실적으로 판단합니다.</p>
+    {% endif %}
+  </div>
+  {% for c in m.candidates %}
+  <div class="card">
+    <div class="row between">
+      <h3>{{ c.agency_id }} {{ c.agency_name }} {% if c.proposed_by_sales %}<span class="pill neutral">영업 입력</span>{% endif %}</h3>
+      <span class="row"><span class="score">{{ c.score }}</span>
+      {% set rv = r.reviews.get(c.agency_id) %}
+      {% if c.decision=='auto' %}<span class="pill ok">자동 그룹</span>
+      {% elif c.decision=='review' %}{% if rv %}<span class="pill {{ 'ok' if rv.decision=='confirm' else 'neutral' }}">내부감시 {{ '확정' if rv.decision=='confirm' else '제외' }}</span>{% else %}<span class="pill warn">수동 검토 대기</span>{% endif %}
+      {% else %}<span class="pill neutral">미그룹</span>{% endif %}</span>
+    </div>
+    {% for s in c.signals %}
+    <div class="sig"><b>{{ s[0] }}</b><span class="small d">{{ s[1] }}</span><div class="bar"><i style="width:{{ (s[3]/s[2]*100) if s[2] else 0 }}%"></i></div><span class="mono">{{ s[3] }}/{{ s[2] }}</span></div>
+    {% endfor %}
+    {% for u in c.unavailable %}<div class="sig na"><b>{{ u }}</b><span class="small d">데이터 없음 · 수집 예정</span><div class="bar"></div><span class="mono">–</span></div>{% endfor %}
+    {% if rv and rv.memo %}<p class="small">검토 메모: {{ rv.memo }} ({{ rv.at }})</p>{% endif %}
+    {% if st=='MANUAL_REVIEW' and c.decision=='review' and not rv %}
+    <form method="post" action="{{ url_for('do_review', rid=r.id) }}" class="row">
+      <input type="hidden" name="agency_id" value="{{ c.agency_id }}">
+      <input name="memo" placeholder="근거 확인 메모" style="flex:1;min-width:200px" value="정산계좌·입금 근거 확인">
+      <button class="btn primary {{ 'mine' if role=='내부감시팀' }}" name="decision" value="confirm">그룹 확정</button>
+      <button class="btn" name="decision" value="exclude">그룹에서 제외</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if m.controls %}
+  <div class="card dash"><span class="small">대조 · 동명이인 (이름만 같고 점수 {{ RULES.manual_review }} 미만 → 묶지 않음):
+    {% for c in m.controls %}{{ c.name }} {{ c.pair }} {{ c.score }}점{{ ', ' if not loop.last }}{% endfor %}</span></div>
+  {% endif %}
+  {% if st=='MATCHING' and not r.agg %}
+  <form method="post" action="{{ url_for('do_eval', rid=r.id) }}" class="row">
+    <button class="btn primary {{ 'mine' if role=='영업팀' }}">그룹 확정 · 실적 합산 및 리스크 검사</button>
+    <span class="small">그룹: {{ members|join(', ') }}</span>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  {% if r.agg %}
+  {% set a = r.agg %}
+  {% set scale = [a.total_sales, a.threshold]|max * 1.15 %}
+  <div class="card">
+    <div class="row between"><h2>실적 합산 · 조건 검증</h2><span class="mono">{{ a.total_sales|man }} / 기준 {{ a.threshold|man }}</span></div>
+    <div class="stack">
+      {% for mb in a.members %}<i style="width:{{ mb.sales/scale*100 }}%" title="{{ mb.agency_id }}">{{ mb.agency_id[2:] }} {{ mb.sales|man }}</i>{% endfor %}
+      <span class="th" style="left:{{ a.threshold/scale*100 }}%"><em>기준 {{ a.threshold|man }}</em></span>
+    </div>
+    <p class="small">대리점별 {{ a.members|map(attribute='sales')|map('man')|join(' · ') }} · 대리점 1곳 월매출 최고치 {{ a.single_max|man }}.
+      {% if a.meets %}합산하면 기준을 {{ (a.total_sales-a.threshold)|man }} 넘습니다.{% else %}합산해도 기준에 {{ (a.threshold-a.total_sales)|man }} 모자랍니다.{% endif %}</p>
+    <div class="card ai">
+      <span class="ai-tag">AI 계산</span>
+      <dl class="kv">
+        <dt>합산 매출</dt><dd class="mono">{{ a.total_sales|won }}</dd>
+        <dt>요청 장려금</dt><dd class="mono"><b>{{ a.amount|won }}</b> · 요율 {{ a.rate|pct }} · {{ a.rebate_ids|join(', ') }}</dd>
+        <dt>일반 요율</dt><dd class="mono">{{ a.std_min|pct }}~{{ a.std_max|pct }} (평균 {{ a.std_mean|pct }}, {{ a.std_n }}건)</dd>
+        <dt>일반 적용 시</dt><dd class="mono">{{ a.std_amount|won }} (차이 {{ '+' if a.diff>=0 }}{{ a.diff|won }})</dd>
+      </dl>
+      <p class="small">우대 요율표가 없어(<span class="tbd">입력 예정</span>) 요율의 정당성은 결재자가 판단합니다.</p>
+    </div>
+    {% if a.prior_excess > 0 %}
+    <div class="card hold"><b>사후 검토 자동 등록</b><span class="small">이전 기간 같은 그룹에 {{ a.prior_paid|won }}이 {{ a.prior_approver }} 결재로 지급됐고, 일반 평균 요율 대비 {{ a.prior_excess|won }} 더 나갔습니다. 내부감시팀 검토 목록에 올렸습니다.</span></div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if r.risk %}
+  <div class="card">
+    <h2>리스크 검사</h2>
+    <ul class="check">
+      {% for c in r.risk.checks %}
+      <li><span class="m {{ c.result }}">{{ {'pass':'✓','resolved':'✓','fail':'✕','warn':'△','info':'i','nodata':'–'}[c.result] }}</span>
+        <span><b>{{ c.label }}</b> · {{ c.detail }}</span></li>
+      {% endfor %}
+    </ul>
+    {% for c in r.risk.checks if c.key=='overdue' and c.rows %}
+    <div class="tbl"><table><thead><tr><th>채권</th><th>대리점</th><th class="num">미회수</th><th class="num">경과</th></tr></thead><tbody>
+      {% for row in c.rows %}<tr><td class="mono">{{ row[0] }}</td><td>{{ row[1] }}</td><td class="num">{{ row[2]|won }}</td><td class="num">{{ row[3] }}일</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if st == 'PENDING' or r.resolutions %}
+  {% set od = (r.risk.checks|selectattr('key','equalto','overdue')|list)[0] if r.risk else None %}
+  <div class="card {{ 'hold' if st=='PENDING' }}">
+    <h2>{{ '⚠ 지급 보류 · 사유 소명 요망' if st=='PENDING' else '보류 처리 이력' }}</h2>
+    {% if st=='PENDING' and 'overdue' in r.risk.hold and od %}
+    <div class="card ai"><span class="ai-tag">AI 상계안</span>
+      <p>장려금 {{ r.agg.amount|won }}을 연체 채권과 상계하면 90일 초과 잔액이 {{ (od.amount - r.agg.amount)|won }}으로 줄어듭니다. (그룹 미회수 합계 {{ od.total_outstanding|won }})</p></div>
+    {% endif %}
+    <div class="thread">
+      {% for t in threads %}<div class="msg"><b>{{ t.role }}</b> <span class="small mono">{{ t.at }}</span><br>{{ t.body }}</div>{% endfor %}
+      {% for k, v in r.resolutions.items() %}<div class="msg"><b>{{ v.by }}</b> <span class="small mono">{{ v.at }}</span><br>보류 해제({{ v.label }}) {{ v.memo }}</div>{% endfor %}
+    </div>
+    {% if st=='PENDING' %}
+    <form method="post" action="{{ url_for('do_explain', rid=r.id) }}" class="card">
+      <label class="small">소명 (영업팀 · 품질팀)<textarea name="body" placeholder="회수 계획 또는 소명 내용"></textarea></label>
+      <div><button class="btn primary {{ 'mine' if role=='영업팀' }}">소명 제출</button></div>
+    </form>
+    {% if 'overdue' in r.risk.hold %}
+    <form method="post" action="{{ url_for('do_resolve', rid=r.id) }}" class="row">
+      <input type="hidden" name="key" value="overdue">
+      <input name="memo" placeholder="재무팀 메모" style="flex:1;min-width:200px">
+      <button class="btn primary {{ 'mine' if role=='재무팀' }}" name="kind" value="collected">연체 회수 확인 · 해제</button>
+      <button class="btn" name="kind" value="offset">장려금 상계로 해제</button>
+    </form>
+    {% endif %}
+    {% if 'malicious' in r.risk.hold %}
+    <form method="post" action="{{ url_for('do_resolve', rid=r.id) }}" class="row">
+      <input type="hidden" name="key" value="malicious"><input name="memo" placeholder="품질팀 메모" style="flex:1">
+      <button class="btn primary {{ 'mine' if role=='품질팀' }}" name="kind" value="released">품질팀 해제</button>
+    </form>
+    {% endif %}
+    <form method="post" action="{{ url_for('do_dismiss', rid=r.id) }}" class="row">
+      <input name="memo" placeholder="기각 사유" style="flex:1;min-width:200px"><button class="btn danger">소명 기각 · 종결</button>
+    </form>
+    <p class="small">해제는 담당 부서만 할 수 있고, 영업팀 소명이 먼저 있어야 합니다. 해제되면 리스크 검사를 다시 거쳐 결재로 넘어갑니다.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if st in ('AWAITING_APPROVAL','PAID','REJECTED','ALT_PROPOSED','CREDIT_SCHEDULED','CREDIT_SETTLED') or approvals %}
+  {% set c = r.cash %}
+  <div class="card">
+    <h2>결재</h2>
+    <p><b>관련 거래처 {{ members|length }}곳의 합산 실적이 기준을 넘었습니다{% if r.match.candidates %} (매칭 {% for x in r.match.candidates if x.agency_id in members %}{{ x.agency_id }} {{ x.score }}점{{ ', ' if not loop.last }}{% endfor %}){% endif %}.</b> 장려금 {{ r.agg.amount|won }} ({{ r.agg.rate|pct }}, 일반 대비 {{ '+' if r.agg.diff>=0 }}{{ r.agg.diff|won }}){% if r.settlement=='OFFSET' %} · <span class="pill warn">연체 채권 상계 지급</span>{% endif %}</p>
+    {% if c %}
+    <div class="card dash">
+      <span class="small">참고 · 그룹 현금 ({{ as_of }})</span>
+      <div class="row"><span class="small" style="width:64px">Corevia</span><span class="pill ok">{{ c.cv_close|eok }} · 최근 월 {{ c.cv_month_net|eok }}</span></div>
+      <div class="row"><span class="small" style="width:64px">Masil</span><span class="pill {{ 'crit' if c.months_to_breach and c.months_to_breach < 6 else 'warn' }}">{{ c.ms_close|eok }} · 약정 하한 {{ c.covenant|eok }}까지 {{ c.headroom|eok }} · 6개월 평균 {{ c.ms_avg_change|eok }}/월</span>
+        {% if c.breach_date %}<span class="small">→ 추세 유지 시 {{ c.breach_date }} 전후 하한 도달</span>{% endif %}</div>
+      {% for dch in c.collection_drops %}<span class="small">회수 지연: {{ dch.channel }} {{ dch.name }} ({{ dch.partner }}) 회수율 {{ dch.prior }}% → 최근 4개월 {{ dch.recent }}% · 미회수 {{ dch.shortfall|eok }}</span>{% endfor %}
+      {% if c.board %}<span class="small">이사회: {{ c.board[2] if c.board|length > 2 else c.board[0] }}</span>{% endif %}
+    </div>
+    {% endif %}
+    <div class="row"><span class="small">결재선</span>
+      {% for step, who in [(1,'재무팀'),(2,'내부감시팀')] %}
+        {% set ap = (approvals|selectattr('role','equalto',who)|list) %}
+        <span class="pill {{ 'ok' if ap and ap[0].decision=='approve' else 'crit' if ap else 'info' if st=='AWAITING_APPROVAL' and next_approver==who else 'neutral' }}">{{ who }} {{ ('승인' if ap[0].decision=='approve' else '거절 ' ~ ap[0].reason) if ap else ('검토 중' if st=='AWAITING_APPROVAL' and next_approver==who else '대기') }}</span>{{ '→' if step==1 }}
+      {% endfor %}
+      <span class="small">(현행: 영업지원팀 단독)</span>
+    </div>
+    {% if st=='AWAITING_APPROVAL' %}
+    <div class="grid2">
+      <form method="post" action="{{ url_for('do_approve', rid=r.id) }}" class="card">
+        <label class="small">{{ next_approver }} 승인 메모<input name="memo" style="width:100%" value="매칭 근거·합산 실적 확인"></label>
+        <div><button class="btn primary {{ 'mine' if role==next_approver }}">승인</button></div>
+      </form>
+      <form method="post" action="{{ url_for('do_reject', rid=r.id) }}" class="card">
+        <label class="small">거절 사유 코드 (필수)
+          <select name="reason" style="width:100%">
+            <option value="">선택</option>
+            {% for k, v in reasons.items() %}<option value="{{ k }}">{{ k }} · {{ v }}</option>{% endfor %}
+          </select></label>
+        <label class="small">메모<input name="memo" style="width:100%"></label>
+        <div><button class="btn danger">거절</button></div>
+      </form>
+    </div>
+    {% endif %}
+    {% for ap in approvals if ap.memo %}<p class="small">{{ ap.role }} {{ '승인' if ap.decision=='approve' else '거절' }} 메모: {{ ap.memo }} · {{ ap.at }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if r.alt %}
+  {% set al = r.alt %}
+  {% set split = r.alt_accept.get('plan')=='split' %}
+  <div class="card ai">
+    <span class="ai-tag">AI 대안 · 거절 사유 CASH_SHORTAGE 감지</span>
+    <h2>{{ al.channel.channel_name }}({{ al.channel.channel_id }}) 다음 발주에서 '재고 할인(Credit)'으로 대체 지급</h2>
+    <dl class="kv">
+      <dt>안</dt><dd>{% if split %}<b>분할안</b> · 크레딧 {{ al.split.credit|won }} + Masil 약정 리스크 해소 후 현금 {{ al.split.cash|won }}{% else %}<b>크레딧 100%</b> · {{ al.credit|won }}{% endif %}</dd>
+      <dt>적용처</dt><dd>{{ al.channel.channel_name }} · 결제조건 {{ al.channel.payment_terms_days }}일 · 그룹 {{ members|join(', ') }} 발주서</dd>
+      <dt>다음 발주</dt><dd>{{ al.next_order or '미정' }} <span class="small">({{ al.next_order_basis }})</span></dd>
+      <dt>적용 품목</dt><dd>Corevia SKU {{ al.skus_ok|length }}종 <span class="small">({{ al.skus_ok|join(', ') }})</span>{% if al.skus_excluded %}<br><span class="small">제외 {{ al.skus_excluded|length }}종: {{ al.skus_excluded|join(', ') }} — 확정 결함 lot 품목({{ al.blocked_pl|join(', ') }})</span>{% endif %}</dd>
+      <dt>유효기간</dt><dd class="mono">~{{ al.valid_to }} ({{ RULES.credit_valid_days }}일)</dd>
+      <dt>Corevia 현금</dt><dd>이번 달 현금 유출 {{ (al.split.cash if split else 0)|won }} (크레딧은 매출 할인 처리)</dd>
+      <dt>Masil 영향</dt><dd class="mono">약정 여유 대비 {{ al.masil_impact_pct }}% <span class="tbd">Corevia↔Masil 정산 방식 입력 예정</span></dd>
+    </dl>
+    <div class="row">
+      <span class="pill {{ 'ok' if '영업팀' in r.alt_accept else 'neutral' }}">영업팀 {{ '수락' if '영업팀' in r.alt_accept else '대기' }}</span>
+      <span class="pill {{ 'ok' if '재무팀' in r.alt_accept else 'neutral' }}">재무팀 {{ '수락' if '재무팀' in r.alt_accept else '대기' }}</span>
+    </div>
+    {% if st=='ALT_PROPOSED' %}
+    <div class="row">
+      <form method="post" action="{{ url_for('do_alt_accept', rid=r.id) }}" class="inline"><button class="btn primary {{ 'mine' if role in ('영업팀','재무팀') and role not in r.alt_accept }}">{{ role }}으로 수락</button></form>
+      <form method="post" action="{{ url_for('do_alt_plan', rid=r.id) }}" class="inline"><button class="btn" name="plan" value="{{ 'full' if split else 'split' }}">{{ '크레딧 100%안으로' if split else '분할안으로 변경' }}</button></form>
+      <form method="post" action="{{ url_for('do_alt_decline', rid=r.id) }}" class="inline"><button class="btn danger">대안 거절</button></form>
+    </div>
+    <p class="small">안을 바꾸면 양측 수락이 초기화됩니다. 이사회 지침: 전액·분할 배분 모두 허용.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if credit %}
+  <div class="card {{ 'okb' }}">
+    <h2>{{ '크레딧 정산 완료' if credit.status=='SETTLED' else '지급 계획 변경 완료 · 크레딧 예약' }}</h2>
+    <dl class="kv"><dt>크레딧</dt><dd class="mono">CR-{{ '%04d'|format(credit.id) }} · {{ credit.amount|won }}{% if credit.cash_amount %} (+ 이연 현금 {{ credit.cash_amount|won }}){% endif %}</dd>
+      <dt>채널</dt><dd>{{ credit.channel }}</dd><dt>유효기간</dt><dd class="mono">~{{ credit.valid_to }}</dd>
+      {% if credit.masil_po %}<dt>반영 발주서</dt><dd class="mono">{{ credit.masil_po }} · {{ credit.settled_at }}</dd>{% endif %}</dl>
+    {% if st=='CREDIT_SCHEDULED' %}
+    <form method="post" action="{{ url_for('do_settle', rid=r.id) }}" class="row">
+      <input name="po" placeholder="Masil 발주서 번호 (예: PO-MS-2607-001)" style="flex:1;min-width:220px">
+      <button class="btn primary {{ 'mine' if role=='Masil' }}">발주서 차감 반영 확인</button>
+    </form>
+    <p class="small">MVP에서는 Masil 담당자가 발주서 반영을 수기로 확인합니다.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if st=='PAID' %}
+  <div class="card okb">
+    <h2>{{ r.agg.amount|won }} {{ '연체 채권 상계 처리' if r.settlement=='OFFSET' else '현금 지급 처리' }}</h2>
+    <div class="tbl"><table><thead><tr><th>장려금 ID</th><th>대리점</th><th class="num">금액</th><th>계좌</th></tr></thead><tbody>
+      {% for mb in r.agg.members %}<tr><td class="mono">{{ mb.rebate_ids|join(', ') }}</td><td>{{ mb.agency_id }} {{ mb.agency_name }}</td><td class="num">{{ mb.rebate|won }}</td><td class="mono small">{{ mb.account }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+  {% endif %}
+  {% if st=='NOT_ELIGIBLE' %}<div class="card crit"><b>합산 실적 기준 미달로 종결</b></div>{% endif %}
+  {% if st=='CLOSED' %}<div class="card"><b>종결</b><span class="small">감사 로그에서 사유를 확인하세요.</span></div>{% endif %}
+</div>
+
+<aside class="side">
+  <div class="card">
+    <h3>이벤트 로그 <span class="small">(감사 로그 · 수정 불가)</span></h3>
+    <ol class="timeline">
+      {% for a in audit %}<li><span class="t">{{ a.at[5:16] }} · {{ a.actor }}</span><br>{{ a.action }}{% if a.after %} <span class="small mono">{{ a.before or '' }}→{{ a.after }}</span>{% endif %}</li>{% endfor %}
+    </ol>
+  </div>
+</aside>
+</div>
+{% endblock %}
