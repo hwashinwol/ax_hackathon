@@ -1,4 +1,4 @@
-# ax_hackaton
+# ax_hackathon
 
 Aurora 그룹 · Corevia Cosmetics 관련 거래처 판매장려금 결재 시스템 MVP 기획.
 
