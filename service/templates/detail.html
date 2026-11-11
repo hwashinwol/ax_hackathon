@@ -250,7 +250,7 @@
     <dl class="kv">
       <dt>안</dt><dd>{% if split %}<b>분할안</b> · 크레딧 {{ al.split.credit|won }} + 이 그룹 연체 채권 회수 후 현금 {{ al.split.cash|won }}{% else %}<b>크레딧 100%</b> · {{ al.credit|won }}{% endif %}</dd>
       <dt>적용처</dt><dd>{{ al.channel.channel_name }} · 결제조건 {{ al.channel.payment_terms_days }}일 · 그룹 {{ members|join(', ') }} 발주서</dd>
-      <dt>다음 발주</dt><dd>{{ al.next_order or '미정' }} <span class="small">({{ al.next_order_basis }})</span></dd>
+      <dt>다음 발주</dt><dd>{{ al.next_order or '미정' }}{% if al.next_order_basis %} <span class="small">({{ al.next_order_basis }})</span>{% endif %}</dd>
       <dt>적용 품목</dt><dd>Corevia SKU {{ al.skus_ok|length }}종 <span class="small">({{ al.skus_ok|join(', ') }})</span>{% if al.skus_excluded %}<br><span class="small">제외 {{ al.skus_excluded|length }}종: {{ al.skus_excluded|join(', ') }} — 확정 결함 lot 품목({{ al.blocked_pl|join(', ') }})</span>{% endif %}</dd>
       {% if al.exclusion_basis %}
       <dt>제외 판단 근거</dt><dd class="small">{{ al.exclusion_basis.rule }}.

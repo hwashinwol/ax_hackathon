@@ -411,7 +411,7 @@ def alternative(d: Data, amount: int, members, cashinfo):
     ok_sku = sku[~sku.product_id.isin(blocked_pl)]
     ex_sku = sku[sku.product_id.isin(blocked_pl)]
     # 대리점의 다음 발주: 대리점 채널 청구일 간격으로 추정
-    next_order, basis = None, ""
+    next_order, order_basis = None, ""
     if channel:
         arm = d.t("fin_ar_aging_ms.csv")
         inv = sorted(set(arm[arm.channel_id == channel["channel_id"]].invoice_date))
@@ -419,7 +419,7 @@ def alternative(d: Data, amount: int, members, cashinfo):
             gaps = sorted((date.fromisoformat(b) - date.fromisoformat(a)).days for a, b in zip(inv, inv[1:]))
             gap = max(gaps[len(gaps) // 2], 7)
             next_order = (date.fromisoformat(inv[-1]) + timedelta(days=gap)).isoformat()
-            basis = f"{channel['channel_id']} 청구일 {', '.join(inv[-2:])} 간격으로 추정"
+            order_basis = f"{channel['channel_id']} 청구일 {', '.join(inv[-2:])} 간격으로 추정"
     credit = int(round(amount * RULES["credit_ratio"]))
     valid_to = (date.fromisoformat(d.as_of) + timedelta(days=RULES["credit_valid_days"])).isoformat()
     split_cash = int(round(amount * RULES["split_cash_ratio"]))
@@ -464,7 +464,7 @@ def alternative(d: Data, amount: int, members, cashinfo):
         "credit": credit, "channel": channel, "valid_to": valid_to,
         "skus_ok": [f"{r.sku_id} {r.sku_name}" for r in ok_sku.itertuples()],
         "skus_excluded": [f"{r.sku_id} {r.sku_name}" for r in ex_sku.itertuples()],
-        "blocked_pl": blocked_pl, "next_order": next_order, "next_order_basis": basis,
+        "blocked_pl": blocked_pl, "next_order": next_order, "next_order_basis": order_basis,
         "masil_impact_pct": round(credit / cashinfo["headroom"] * 100, 2) if cashinfo.get("headroom") else None,
         "settlement": settle, "lead_time_weeks_max": int(lead) if lead == lead and lead is not None else None,
         "split": {"cash": split_cash, "credit": amount - split_cash},

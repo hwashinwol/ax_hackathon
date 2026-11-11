@@ -194,6 +194,55 @@ class Flow(Base):
         con.close()
         self.assertEqual(row, (1944049, 1944048, "PAID", "PAY-2607-0012"))
 
+    def test_next_order_basis_is_text(self):
+        """대안 화면의 '다음 발주' 근거에 딕셔너리가 그대로 찍히지 않는다."""
+        self.start()
+        html = self.post("재무팀", "/requests/1/reject", reason="CASH_SHORTAGE")
+        self.assertIn("청구일", html)
+        self.assertNotIn("{&#39;rule&#39;", html)
+
+    def test_reject_follows_approval_order(self):
+        """거절도 재무팀 → 내부감시팀 → 영업임원 순서를 따른다."""
+        self.start()
+        html = self.post("영업임원", "/requests/1/reject", reason="POLICY")
+        self.assertIn("재무팀 결재 차례", html)
+        self.assertEqual(self.status(), "AWAITING_APPROVAL")
+        self.post("재무팀", "/requests/1/approve")
+        html = self.post("재무팀", "/requests/1/reject", reason="POLICY")     # 이미 승인한 결재자는 거절할 수 없음
+        self.assertIn("내부감시팀 결재 차례", html)
+        self.post("내부감시팀", "/requests/1/reject", reason="MATCH_DOUBT")
+        self.assertEqual(self.status(), "CLOSED")
+
+    def test_duplicate_payment_blocked(self):
+        """같은 월·같은 관련자 그룹이 이미 지급됐으면 상신 단계에서 막는다."""
+        self.start()
+        for who in ("재무팀", "내부감시팀", "영업임원"):
+            self.post(who, "/requests/1/approve")
+        self.assertEqual(self.status(), "PAID")
+        self.post("영업팀", "/new", anchor_id="D-024", period="2026-06")      # 기준 거래처만 바꾼 같은 그룹
+        self.post("영업팀", "/requests/2/match")
+        html = self.post("영업팀", "/requests/2/evaluate")
+        self.assertIn("중복 지급 차단", html)
+        self.assertEqual(self.status(2), "MATCHING")
+        self.post("영업팀", "/new", anchor_id="D-011", period="2026-05")      # 원천 데이터에서 이미 승인(지급)된 달
+        self.post("영업팀", "/requests/3/match")
+        html = self.post("영업팀", "/requests/3/evaluate")
+        self.assertIn("이미 지급(승인)", html)
+        self.assertEqual(self.status(3), "MATCHING")
+
+    def test_parallel_requests_only_one_paid(self):
+        """같은 그룹·같은 월 요청이 나란히 결재에 올라와도 한 건만 지급된다."""
+        self.start()
+        self.post("영업팀", "/new", anchor_id="D-037", period="2026-06")
+        self.post("영업팀", "/requests/2/match")
+        self.post("영업팀", "/requests/2/evaluate")
+        for rid in (1, 2):
+            for who in ("재무팀", "내부감시팀", "영업임원"):
+                html = self.post(who, f"/requests/{rid}/approve")
+        self.assertEqual(self.status(1), "PAID")
+        self.assertIn("중복 지급 차단", html)
+        self.assertEqual(self.status(2), "AWAITING_APPROVAL")
+
     def test_audit_page_with_judgment(self):
         """요청에 묶이지 않은 감사 기록(품질 판정)이 있어도 감사 로그 화면이 열린다."""
         self.post("품질팀", "/quality", agency_id="D-024", demo="1")

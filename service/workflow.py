@@ -149,6 +149,28 @@ class Workflow:
                 ids.append(c["agency_id"])
         return ids
 
+    # 지급이 끝났거나 지급이 확정된 상태. 같은 월·같은 관련자 그룹의 요청이 이 상태면 중복 지급이다.
+    SETTLED = ("PAID", "CREDIT_SCHEDULED", "CASH_PENDING", "CREDIT_SETTLED")
+
+    def _block_duplicate(self, rid, members, months):
+        """중복 지급 차단: 원천 데이터에서 이미 '승인'(지급)된 장려금, 또는 이 서비스에서 이미 지급 처리된 요청과 겹치면 막는다."""
+        rb = self.d.t("sales_rebate_payment_cv.csv")
+        if len(rb):
+            paid = rb[rb.agency_id.isin(members) & rb.period_ym.isin(months) & (rb.approval_status == "승인")]
+            if len(paid):
+                raise WorkflowError(f"중복 지급 차단: {', '.join(sorted(set(paid.period_ym)))} 장려금은 이미 지급(승인)되었습니다 "
+                                    f"({', '.join(paid.rebate_id)}).")
+        for o in self.con.execute("SELECT id FROM requests WHERE id<>? AND status IN (%s)" % ",".join("?" * len(self.SETTLED)),
+                                  (rid, *self.SETTLED)).fetchall():
+            o = self.get(o["id"])
+            if not (o["match"] and o["agg"]):
+                continue
+            same = sorted(set(members) & set(self.members(o)))
+            same_m = sorted(set(months) & set(o["agg"]["months"]))
+            if same and same_m:
+                raise WorkflowError(f"중복 지급 차단: 같은 관련자 그룹({', '.join(same)})의 {', '.join(same_m)} 장려금은 "
+                                    f"{o['code']}에서 이미 지급 처리되었습니다({o['status']}).")
+
     # ── 품질팀 클레임 판정 (원천 qc_claims_cv에 판정 필드와 대리점 연결이 없어 시스템에서 받는다) ──
     def judgments(self):
         return [dict(j) for j in self.con.execute("SELECT * FROM claim_judgments ORDER BY claim_date DESC, id DESC")]
@@ -220,6 +242,7 @@ class Workflow:
         self._need(r, "MATCHING", "영업팀", actor)
         members = self.members(r)
         agg = engine.aggregate(self.d, members, r["period"])
+        self._block_duplicate(rid, members, agg["months"])      # 상신 단계에서 중복 지급 차단
         self._set(rid, agg_json=J(agg))
         self.audit(rid, "AI", "관련자 합산·한도 비교", payload={"members": members, "amount": agg["amount"],
                                                             "limit": agg["limit"], "monthly": agg["monthly"],
@@ -326,6 +349,8 @@ class Workflow:
             nxt = APPROVAL_CHAIN[step]
             self.notify(rid, [nxt], f"{r['code']} · {actor} 승인, {step + 1}차 결재 요청")
         else:
+            # 같은 그룹·같은 월 요청이 나란히 결재에 올라온 경우를 지급 직전에 한 번 더 막는다
+            self._block_duplicate(rid, self.members(r), r["agg"]["months"])
             how = "현금 지급"
             pays = [{"rebate_ids": m["rebate_ids"], "agency_id": m["agency_id"], "amount": m["rebate"], "account": m["account"]}
                     for m in r["agg"]["members"]]
@@ -338,6 +363,9 @@ class Workflow:
         self._need(r, "AWAITING_APPROVAL", APPROVAL_CHAIN, actor)
         if reason not in REJECT_REASONS:
             raise WorkflowError("거절 사유 코드를 선택하세요.")
+        need = self.next_approver(rid)
+        if actor != need:           # 거절도 승인과 같은 결재 순서를 따른다
+            raise WorkflowError(f"지금은 {need} 결재 차례입니다.")
         step = APPROVAL_CHAIN.index(actor) + 1
         self.con.execute("INSERT INTO approvals(request_id,step,role,decision,reason,memo,at) VALUES(?,?,?,?,?,?,?)",
                          (rid, step, actor, "reject", reason, memo, now()))
