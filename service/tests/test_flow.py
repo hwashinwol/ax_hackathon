@@ -169,6 +169,36 @@ class Flow(Base):
         self.post("Masil", "/requests/1/credit/settle", po="SPO-0005")
         self.assertEqual(self.status(), "CREDIT_SETTLED")
 
+    def test_scenario3_split_deferred_cash(self):
+        """분할안: 크레딧 차감 확인 → 이연 현금분 지급 대기 → 재무팀 지급으로 정산 완료."""
+        self.start()
+        self.post("재무팀", "/requests/1/reject", reason="CASH_SHORTAGE")
+        self.post("재무팀", "/requests/1/alt/plan", plan="split")
+        self.post("영업팀", "/requests/1/alt/accept")
+        self.post("재무팀", "/requests/1/alt/accept")
+        self.assertEqual(self.status(), "CREDIT_SCHEDULED")
+        self.post("Masil", "/requests/1/credit/settle", po="SPO-0005")
+        self.assertEqual(self.status(), "CASH_PENDING")
+        self.assertIn("이연 현금", self.page("재무팀", "/notices"))
+        html = self.post("Masil", "/requests/1/credit/cash", ref="PAY-1")
+        self.assertIn("권한이 없습니다", html)
+        html = self.post("재무팀", "/requests/1/credit/cash", ref="")
+        self.assertIn("전표", html)
+        self.assertEqual(self.status(), "CASH_PENDING")
+        html = self.post("재무팀", "/requests/1/credit/cash", ref="PAY-2607-0012", memo="연체 회수 확인")
+        self.assertEqual(self.status(), "CREDIT_SETTLED")
+        self.assertIn("분할 정산 완료", html)
+        self.assertIn("PAY-2607-0012", html)
+        con = sqlite3.connect(self.db)
+        row = con.execute("SELECT amount, cash_amount, cash_status, cash_ref FROM credits").fetchone()
+        con.close()
+        self.assertEqual(row, (1944049, 1944048, "PAID", "PAY-2607-0012"))
+
+    def test_audit_page_with_judgment(self):
+        """요청에 묶이지 않은 감사 기록(품질 판정)이 있어도 감사 로그 화면이 열린다."""
+        self.post("품질팀", "/quality", agency_id="D-024", demo="1")
+        self.assertEqual(self.c.get("/audit").status_code, 200)
+
     def test_unrelated_agency_within_limit(self):
         self.post("영업팀", "/new", anchor_id="D-001", period="2026-06")
         self.post("영업팀", "/requests/1/match")

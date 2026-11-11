@@ -14,7 +14,7 @@ from workflow import Workflow, WorkflowError, connect, L
 STATUS_STYLE = {
     "REQUESTED": "neutral", "MATCHING": "info", "MANUAL_REVIEW": "warn", "WITHIN_LIMIT": "neutral",
     "RISK_CHECK": "info", "PENDING": "warn", "AWAITING_APPROVAL": "info", "PAID": "ok", "REJECTED": "crit",
-    "ALT_PROPOSED": "info", "CREDIT_SCHEDULED": "info", "CREDIT_SETTLED": "ok", "CLOSED": "neutral",
+    "ALT_PROPOSED": "info", "CREDIT_SCHEDULED": "info", "CASH_PENDING": "warn", "CREDIT_SETTLED": "ok", "CLOSED": "neutral",
 }
 STEPS = ["REQUESTED", "MATCHING", "RISK_CHECK", "AWAITING_APPROVAL", "처리"]
 
@@ -192,6 +192,10 @@ def create_app(data_dir=DATA_DIR, db_path=DB_PATH, ai_client=None):
     def do_settle(rid):
         return act(wf().settle_credit, rid, request.form.get("po", ""))
 
+    @app.post("/requests/<int:rid>/credit/cash")
+    def do_pay_cash(rid):
+        return act(wf().pay_deferred_cash, rid, request.form.get("ref", ""), request.form.get("memo", ""))
+
     # 명세 시나리오 2의 예시 클레임 3건. 원천 데이터에 없는 값이라 '시연용 입력'으로 표시해 넣는다.
     DEMO_CLAIMS = [("2026-02-10", "포장 파손"), ("2026-04-03", "성분 이상"), ("2026-05-21", "변질 주장")]
 
@@ -263,5 +267,5 @@ def create_app(data_dir=DATA_DIR, db_path=DB_PATH, ai_client=None):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5060))
+    port = int(os.environ.get("PORT", 5080))
     create_app().run(host="127.0.0.1", port=port, debug=False)

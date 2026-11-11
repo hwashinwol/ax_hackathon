@@ -7,7 +7,7 @@
   <tbody>
   {% for a in rows %}
     <tr><td class="mono">{{ a.id }}</td><td class="mono small">{{ a.at }}</td>
-      <td class="mono"><a href="{{ url_for('detail', rid=a.request_id) }}">{{ a.code }}</a></td>
+      <td class="mono">{% if a.request_id %}<a href="{{ url_for('detail', rid=a.request_id) }}">{{ a.code }}</a>{% else %}<span class="small">-</span>{% endif %}</td>
       <td>{{ a.actor }}</td><td>{{ a.action }}</td>
       <td class="mono small">{{ a.before or '' }}{{ '→' if a.after }}{{ a.after or '' }}</td>
       <td class="mono small" style="max-width:380px;word-break:break-all">{{ a.payload if a.payload != '{}' }}</td></tr>

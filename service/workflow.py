@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS notices(
   id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER, to_role TEXT, level TEXT, text TEXT, at TEXT, read INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS credits(
   id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER, amount INTEGER, cash_amount INTEGER, channel TEXT,
-  valid_to TEXT, skus TEXT, status TEXT, masil_po TEXT, settled_at TEXT);
+  valid_to TEXT, skus TEXT, status TEXT, masil_po TEXT, settled_at TEXT,
+  cash_status TEXT, cash_ref TEXT, cash_memo TEXT, cash_paid_at TEXT);
 CREATE TABLE IF NOT EXISTS audit_log(
   id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER, actor TEXT, action TEXT,
   before TEXT, after TEXT, payload TEXT, at TEXT);
@@ -43,7 +44,8 @@ TRANSITIONS = {
     "AWAITING_APPROVAL": {"PAID", "REJECTED"},
     "REJECTED": {"ALT_PROPOSED", "CLOSED"},
     "ALT_PROPOSED": {"CREDIT_SCHEDULED", "CLOSED"},
-    "CREDIT_SCHEDULED": {"CREDIT_SETTLED"},
+    "CREDIT_SCHEDULED": {"CREDIT_SETTLED", "CASH_PENDING"},
+    "CASH_PENDING": {"CREDIT_SETTLED"},      # 분할안: 크레딧 차감 후 이연 현금분 지급 대기
 }
 
 
@@ -61,6 +63,11 @@ def connect(path=None):
     con = sqlite3.connect(p)
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    # 이전 버전 DB에는 이연 현금분 추적 컬럼이 없다
+    have = {c[1] for c in con.execute("PRAGMA table_info(credits)")}
+    for col in ("cash_status", "cash_ref", "cash_memo", "cash_paid_at"):
+        if col not in have:
+            con.execute(f"ALTER TABLE credits ADD COLUMN {col} TEXT")
     return con
 
 
@@ -371,8 +378,9 @@ class Workflow:
             split = acc.get("plan") == "split"
             credit = alt["split"]["credit"] if split else alt["credit"]
             cash_amt = alt["split"]["cash"] if split else 0
-            self.con.execute("INSERT INTO credits(request_id,amount,cash_amount,channel,valid_to,skus,status) VALUES(?,?,?,?,?,?,?)",
-                             (rid, credit, cash_amt, alt["channel"].get("channel_id"), alt["valid_to"], J(alt["skus_ok"]), "SCHEDULED"))
+            self.con.execute("INSERT INTO credits(request_id,amount,cash_amount,channel,valid_to,skus,status,cash_status) VALUES(?,?,?,?,?,?,?,?)",
+                             (rid, credit, cash_amt, alt["channel"].get("channel_id"), alt["valid_to"], J(alt["skus_ok"]), "SCHEDULED",
+                              "WAITING" if cash_amt else None))
             self.move(rid, actor, "CREDIT_SCHEDULED", "지급 계획 변경 · 크레딧 예약", {"credit": credit, "deferred_cash": cash_amt})
             self.notify(rid, ["Masil"], f"{r['code']} · {alt['channel'].get('channel_name')} 다음 발주에 {credit:,}원 크레딧 차감 예약", "warn")
             self.notify(rid, ["영업팀", "재무팀"], f"{r['code']} · 지급 계획 변경 완료", "ok")
@@ -390,6 +398,29 @@ class Workflow:
         if not po.strip():
             raise WorkflowError("반영된 발주서(PO) 번호를 입력하세요.")
         self.con.execute("UPDATE credits SET status='SETTLED', masil_po=?, settled_at=? WHERE request_id=?", (po, now(), rid))
-        self.move(rid, actor, "CREDIT_SETTLED", "Masil 발주서 크레딧 차감 확인", {"po": po})
-        self.notify(rid, ["영업팀", "재무팀"], f"{r['code']} · 크레딧 정산 완료 ({po})", "ok")
+        cr = self.con.execute("SELECT cash_amount FROM credits WHERE request_id=?", (rid,)).fetchone()
+        cash_amt = cr["cash_amount"] if cr else 0
+        if cash_amt:    # 분할안: 크레딧은 끝났고 이연 현금분이 남았다
+            self.move(rid, actor, "CASH_PENDING", "Masil 발주서 크레딧 차감 확인 · 이연 현금분 지급 대기",
+                      {"po": po, "deferred_cash": cash_amt})
+            self.notify(rid, ["재무팀"], f"{r['code']} · 크레딧 차감 완료({po}). 이연 현금 {cash_amt:,}원은 "
+                        "이 그룹 연체 채권 회수 확인 후 지급하세요", "warn")
+            self.notify(rid, ["영업팀"], f"{r['code']} · 크레딧 차감 완료 ({po}), 현금분 {cash_amt:,}원 지급 대기")
+        else:
+            self.move(rid, actor, "CREDIT_SETTLED", "Masil 발주서 크레딧 차감 확인", {"po": po})
+            self.notify(rid, ["영업팀", "재무팀"], f"{r['code']} · 크레딧 정산 완료 ({po})", "ok")
+        self.con.commit()
+
+    def pay_deferred_cash(self, rid, actor, ref, memo=""):
+        """분할안의 이연 현금분 지급. 재무팀이 이 그룹 연체 채권 회수를 확인하고 지급 전표 번호를 남긴다."""
+        r = self.get(rid)
+        self._need(r, "CASH_PENDING", "재무팀", actor)
+        if not ref.strip():
+            raise WorkflowError("지급 전표(또는 이체) 번호를 입력하세요.")
+        cr = self.con.execute("SELECT cash_amount FROM credits WHERE request_id=?", (rid,)).fetchone()
+        self.con.execute("UPDATE credits SET cash_status='PAID', cash_ref=?, cash_memo=?, cash_paid_at=? WHERE request_id=?",
+                         (ref.strip(), memo, now(), rid))
+        self.move(rid, actor, "CREDIT_SETTLED", "연체 회수 확인 · 이연 현금분 지급 · 분할 정산 완료",
+                  {"cash": cr["cash_amount"], "ref": ref.strip(), "memo": memo})
+        self.notify(rid, ["영업팀", "재무팀"], f"{r['code']} · 이연 현금 {cr['cash_amount']:,}원 지급, 분할 정산 완료 ({ref.strip()})", "ok")
         self.con.commit()

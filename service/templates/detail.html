@@ -285,16 +285,27 @@
 
   {% if credit %}
   <div class="card {{ 'okb' }}">
-    <h2>{{ '크레딧 정산 완료' if credit.status=='SETTLED' else '지급 계획 변경 완료 · 크레딧 예약' }}</h2>
+    <h2>{% if st=='CASH_PENDING' %}크레딧 차감 완료 · 이연 현금분 지급 대기{% elif credit.status=='SETTLED' %}{{ '분할 정산 완료' if credit.cash_amount else '크레딧 정산 완료' }}{% else %}지급 계획 변경 완료 · 크레딧 예약{% endif %}</h2>
     <dl class="kv"><dt>크레딧</dt><dd class="mono">CR-{{ '%04d'|format(credit.id) }} · {{ credit.amount|won }}{% if credit.cash_amount %} (+ 이연 현금 {{ credit.cash_amount|won }}){% endif %}</dd>
       <dt>채널</dt><dd>{{ credit.channel }}</dd><dt>유효기간</dt><dd class="mono">~{{ credit.valid_to }}</dd>
-      {% if credit.masil_po %}<dt>반영 발주서</dt><dd class="mono">{{ credit.masil_po }} · {{ credit.settled_at }}</dd>{% endif %}</dl>
+      {% if credit.masil_po %}<dt>반영 발주서</dt><dd class="mono">{{ credit.masil_po }} · {{ credit.settled_at }}</dd>{% endif %}
+      {% if credit.cash_amount %}<dt>이연 현금</dt><dd>{{ credit.cash_amount|won }} ·
+        {% if credit.cash_status=='PAID' %}<span class="pill ok">지급 완료</span> <span class="mono small">{{ credit.cash_ref }} · {{ credit.cash_paid_at }}</span>{% if credit.cash_memo %} <span class="small">· {{ credit.cash_memo }}</span>{% endif %}
+        {% else %}<span class="pill warn">대기</span> <span class="small">이 그룹 연체 채권 회수 확인 후 재무팀 지급{% if credit.status!='SETTLED' %} (크레딧 차감 확인 뒤 진행){% endif %}</span>{% endif %}</dd>{% endif %}</dl>
     {% if st=='CREDIT_SCHEDULED' %}
     <form method="post" action="{{ url_for('do_settle', rid=r.id) }}" class="row">
       <input name="po" placeholder="Masil 발주서 번호 (예: PO-MS-2607-001)" style="flex:1;min-width:220px">
       <button class="btn primary {{ 'mine' if role=='Masil' }}">발주서 차감 반영 확인</button>
     </form>
     <p class="small">MVP에서는 Masil 담당자가 발주서 반영을 수기로 확인합니다.</p>
+    {% endif %}
+    {% if st=='CASH_PENDING' %}
+    <form method="post" action="{{ url_for('do_pay_cash', rid=r.id) }}" class="row">
+      <input name="ref" placeholder="지급 전표·이체 번호 (예: PAY-2607-0012)" style="flex:1;min-width:200px">
+      <input name="memo" placeholder="연체 회수 확인 메모 (선택)" style="flex:1;min-width:200px">
+      <button class="btn primary {{ 'mine' if role=='재무팀' }}">연체 회수 확인 · 현금분 지급</button>
+    </form>
+    <p class="small">분할안 조건: 이 그룹 연체 채권이 회수된 뒤 현금분을 지급합니다. 기준일 이후 회수 여부는 원천 데이터에 없어 재무팀이 확인합니다.</p>
     {% endif %}
   </div>
   {% endif %}

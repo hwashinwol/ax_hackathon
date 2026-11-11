@@ -98,7 +98,10 @@ def available():
 
 def _client():
     import anthropic
-    return anthropic.Anthropic(timeout=180.0, max_retries=1)
+    # 워크스페이스에 묶이지 않은 키는 요청마다 워크스페이스 ID 헤더가 있어야 한다 (service/.env 의 ANTHROPIC_WORKSPACE_ID)
+    ws = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+    return anthropic.Anthropic(timeout=180.0, max_retries=1,
+                               default_headers={"anthropic-workspace-id": ws} if ws else None)
 
 
 class Toolbox:

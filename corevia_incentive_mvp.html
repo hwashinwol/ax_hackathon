@@ -287,6 +287,7 @@ stateDiagram-v2
   state "거절<br/>REJECTED" as REJ
   state "대안 제안<br/>ALT_PROPOSED" as ALT
   state "크레딧 예약<br/>CREDIT_SCHEDULED" as CRS
+  state "현금분 지급 대기<br/>CASH_PENDING" as CPD
   state "크레딧 정산<br/>CREDIT_SETTLED" as CST
   state "종결<br/>CLOSED" as CLO
   [*] --> REQ
@@ -305,7 +306,9 @@ stateDiagram-v2
   REJ --> CLO: 기타 사유
   ALT --> CRS: 영업·재무 수락
   ALT --> CLO: 대안 거절
-  CRS --> CST: Masil 발주 시 차감
+  CRS --> CST: Masil 발주 시 차감 (크레딧 100%안)
+  CRS --> CPD: Masil 차감 확인 (분할안)
+  CPD --> CST: 연체 회수 확인 후 재무팀 현금분 지급
   PAID --> [*]
   CST --> [*]
   NE --> [*]
@@ -326,7 +329,8 @@ stateDiagram-v2
         <tr><td><span class="pill crit">REJECTED</span></td><td>결재자 중 1명이라도 거절 (사유 코드 필수 · 원천 상태 '반려')</td><td>재무 / 내부감시 / 영업임원</td><td>영업팀</td></tr>
         <tr><td><span class="pill info">ALT_PROPOSED</span></td><td>거절 사유가 <span class="mono">CASH_SHORTAGE</span>일 때</td><td>시스템 제안 → 영업·재무 수락</td><td>영업 · 재무</td></tr>
         <tr><td><span class="pill info">CREDIT_SCHEDULED</span></td><td>양측이 수락하면 Masil CH-04 다음 발주에서 차감하도록 예약</td><td>Masil 연동</td><td>Masil 담당자</td></tr>
-        <tr><td><span class="pill ok">CREDIT_SETTLED</span></td><td>Masil 발주서에 할인 반영을 확인</td><td>시스템</td><td>영업 · 재무</td></tr>
+        <tr><td><span class="pill warn">CASH_PENDING</span></td><td>분할안에서 크레딧 차감이 확인된 뒤, 이연 현금분(50%)이 남은 상태. 이 그룹 연체 채권 회수 확인 후 지급</td><td>재무</td><td>재무팀 · 영업팀</td></tr>
+        <tr><td><span class="pill ok">CREDIT_SETTLED</span></td><td>Masil 발주서에 할인 반영을 확인 (분할안은 재무팀이 지급 전표 번호로 현금분 지급까지 확인)</td><td>시스템 · 재무</td><td>영업 · 재무</td></tr>
       </tbody>
     </table>
   </div>
@@ -455,6 +459,7 @@ stateDiagram-v2
         <tr><td>사후 검토(과거 한도 초과 지급분)</td><td>열람</td><td>열람</td><td>●</td><td>열람</td><td>–</td><td>–</td></tr>
         <tr><td>대안(크레딧) 수락</td><td>●</td><td>●</td><td>열람</td><td>열람</td><td>–</td><td>–</td></tr>
         <tr><td>크레딧 차감 확인</td><td>열람</td><td>열람</td><td>열람</td><td>–</td><td>–</td><td>●</td></tr>
+        <tr><td>분할안 이연 현금분 지급 확인</td><td>열람</td><td>●</td><td>열람</td><td>–</td><td>–</td><td>–</td></tr>
         <tr><td>데이터 업로드 (S0)</td><td>장려금 · 대리점</td><td>채권 · 수금 · 현금</td><td>–</td><td>–</td><td>클레임</td><td>채널 · SKU · 현금 · 캠페인</td></tr>
       </tbody>
     </table>
@@ -639,7 +644,7 @@ const S = {
     <tr><td>CH-04 6월 회수율</td><td class="mono">92.1%</td></tr>
     <tr><td>차감 방식</td><td>대리점 발주서에서 크레딧 먼저 차감</td></tr>
     <tr><td>Corevia↔Masil</td><td>07-21 발주 대금(더마 제외 18.3억 원)에서 같은 금액 차감</td></tr>
-    <tr><td>상태 전환</td><td>발주서 반영 확인 시 CREDIT_SETTLED</td></tr>
+    <tr><td>상태 전환</td><td>발주서 반영 확인 시 CREDIT_SETTLED (분할안은 CASH_PENDING → 재무팀 현금분 지급 후 CREDIT_SETTLED)</td></tr>
    </tbody></table>
   </div>
   <p class="note">MVP에서는 Masil 담당자가 발주서 반영을 직접 확인합니다. API 연동은 이후 단계입니다.</p>`,

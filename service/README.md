@@ -4,8 +4,8 @@
 
 ```
 pip install -r requirements.txt
-python app.py            # http://127.0.0.1:5060
-python -m unittest discover -s tests   # 통합 테스트 10개 (실제 API는 부르지 않음)
+python app.py            # http://127.0.0.1:5080
+python -m unittest discover -s tests   # 통합 테스트 12개 (실제 API는 부르지 않음)
 ```
 
 오른쪽 위에서 **접속 역할**(영업팀·재무팀·내부감시팀·영업임원·품질팀·Masil)을 바꿔 가며 시연합니다. 점선 테두리 버튼이 현재 역할이 누를 차례인 버튼입니다. `시연 초기화`는 요청·결재·로그·품질 판정만 지우고 원천 데이터는 건드리지 않습니다.
@@ -77,6 +77,13 @@ ANTHROPIC_API_KEY=sk-ant-...
 | 3 | 재무팀 | `CASH_SHORTAGE`로 거절 | 근거: Corevia 현금 3개월 연속 감소(218.5억 → 190.8억 원), 이 그룹 연체 2,920만 원. AI가 Masil CH-04 크레딧 대안 제안 → **ALT_PROPOSED** |
 | 4 | 영업팀, 재무팀 | 각각 수락 | **CREDIT_SCHEDULED** |
 | 5 | Masil | 발주서 번호 입력 | **CREDIT_SETTLED** |
+
+분할안(크레딧 50% + 현금 50%)을 고르면 5단계 뒤에 한 단계가 더 있습니다.
+
+| 단계 | 역할 | 동작 | 결과 |
+|---|---|---|---|
+| 5 | Masil | 발주서 번호 입력 | **CASH_PENDING** · 재무팀에 이연 현금분 지급 알림 |
+| 6 | 재무팀 | 이 그룹 연체 채권 회수 확인 후 지급 전표 번호 입력 | **CREDIT_SETTLED** (분할 정산 완료) |
 
 - D-001처럼 관련자가 없고 지급액이 한도 이하면 **WITHIN_LIMIT**(영업지원팀 전결 범위)로 끝납니다.
 - 박준호 D-034에 D-041을 후보로 넣으면 대표자 1개만 일치해 **MANUAL_REVIEW**로 가고, 내부감시팀이 포함 여부를 정합니다.
