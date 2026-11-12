@@ -16,6 +16,8 @@ STATUS_STYLE = {
     "RISK_CHECK": "info", "PENDING": "warn", "AWAITING_APPROVAL": "info", "PAID": "ok", "REJECTED": "crit",
     "ALT_PROPOSED": "info", "CREDIT_SCHEDULED": "info", "CASH_PENDING": "warn", "CREDIT_SETTLED": "ok", "CLOSED": "neutral",
 }
+ANCHORS = {"PENDING": "hold", "AWAITING_APPROVAL": "approval", "ALT_PROPOSED": "alt", "CREDIT_SCHEDULED": "credit",
+           "CASH_PENDING": "credit", "CREDIT_SETTLED": "credit", "PAID": "paid"}
 STEPS = ["REQUESTED", "MATCHING", "RISK_CHECK", "AWAITING_APPROVAL", "처리"]
 
 
@@ -72,7 +74,13 @@ def create_app(data_dir=DATA_DIR, db_path=DB_PATH, ai_client=None):
         except WorkflowError as e:
             wf().con.rollback()
             flash(str(e), "crit")
-        return redirect(url_for("detail", rid=rid))
+            return redirect(url_for("detail", rid=rid))
+        # 처리 뒤에는 지금 봐야 할 카드로 바로 내려간다(보류·결재·대안·정산)
+        try:
+            anchor = ANCHORS.get(wf().get(rid)["status"])
+        except WorkflowError:
+            anchor = None
+        return redirect(url_for("detail", rid=rid, _anchor=anchor))
 
     # ── 화면 ──
     @app.post("/role")

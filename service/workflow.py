@@ -300,7 +300,17 @@ class Workflow:
                     + (" 추가로 필요한 것: " + "; ".join(out["missing"]) if out["missing"] else "")
                     + " (해제 여부는 담당 부서가 결정합니다)")
             self.con.execute("INSERT INTO threads(request_id,role,kind,body,at) VALUES(?,?,?,?,?)", (rid, "AI", "system", body, now()))
+            # AI가 소명이 부족하다고 보면 영업팀 보완 소명을 한 번 더 받아야 해제할 수 있다(해제 결정 자체는 담당 부서가 한다)
+            ai = self.get(rid)["ai"]
+            if not out["sufficient"] and "need_supplement" not in ai:
+                ai["need_supplement"] = self._sales_explains(rid) + 1
+                self._set(rid, ai_json=J(ai))
+                self.notify(rid, ["영업팀"], f"{r['code']} · AI 소명 검토: 보완 소명 필요"
+                            + (f" ({'; '.join(out['missing'])})" if out["missing"] else ""), "warn")
         self.con.commit()
+
+    def _sales_explains(self, rid):
+        return self.con.execute("SELECT COUNT(*) FROM threads WHERE request_id=? AND kind='explain' AND role='영업팀'", (rid,)).fetchone()[0]
 
     def resolve(self, rid, actor, key, kind, memo=""):
         """보류 해제: malicious(품질팀 해제), eligible(재무팀 확인)"""
@@ -314,6 +324,11 @@ class Workflow:
         has_explain = self.con.execute("SELECT 1 FROM threads WHERE request_id=? AND kind='explain' AND role='영업팀'", (rid,)).fetchone()
         if not has_explain:
             raise WorkflowError("영업팀 소명이 먼저 제출되어야 해제할 수 있습니다.")
+        need = r["ai"].get("need_supplement")
+        if need and self._sales_explains(rid) < need:
+            missing = (r["ai"].get("explain") or {}).get("missing") or []
+            raise WorkflowError("AI 소명 검토에서 보완이 필요하다고 봤습니다" + (f" ({'; '.join(missing)})" if missing else "")
+                                + ". 영업팀이 보완 소명을 제출한 뒤에 해제할 수 있습니다.")
         labels = {"released": "품질팀 해제", "confirmed": "재무팀 확인"}
         r["resolutions"][key] = {"kind": kind, "label": labels.get(kind, kind), "memo": memo, "by": actor, "at": now()}
         self._set(rid, resolutions_json=J(r["resolutions"]))

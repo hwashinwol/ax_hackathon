@@ -90,3 +90,10 @@ td.num,th.num{text-align:right;font-family:var(--f-mono)}
 .side{position:sticky;top:70px;display:flex;flex-direction:column;gap:14px}
 .mine{outline:2px dashed var(--accent);outline-offset:3px}
 pre.doc{white-space:pre-wrap;font-size:.8rem;background:var(--wf);padding:10px;border-radius:6px;margin:0}
+
+[id]{scroll-margin-top:72px}
+.cashhead{font-size:1.02rem}
+.cashbars{display:grid;grid-template-columns:64px minmax(0,1fr) 72px;gap:6px 10px;align-items:center;font-size:.85rem}
+.cashbars .track{height:14px;background:var(--surface);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.cashbars .track i{display:block;height:100%;background:var(--warn)}
+.cashbars .mono{text-align:right}

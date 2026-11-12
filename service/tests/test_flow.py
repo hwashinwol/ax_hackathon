@@ -305,6 +305,11 @@ class AgentLoop(Base):
         html = self.post("영업팀", "/requests/1/explain", body="경위 소명")
         self.assertIn("AI 소명 검토: 가짜 소명 평가입니다.", html)        # ② 소명 검토가 스레드에 달림
         self.assertIn("재발 방지 계획", html)
+        self.assertIn("보완 소명 필요", html)
+        html = self.post("품질팀", "/requests/1/resolve", key="malicious", kind="released")
+        self.assertIn("보완 소명을 제출한 뒤에 해제", html)             # AI가 부족하다고 본 소명은 보완 전에 해제할 수 없음
+        self.assertEqual(self.status(), "PENDING")
+        self.post("영업팀", "/requests/1/explain", body="재발 방지 계획과 회수 예정일 보완")
         html = self.post("품질팀", "/requests/1/resolve", key="malicious", kind="released")
         self.assertEqual(self.status(), "AWAITING_APPROVAL")
         self.assertIn("가짜 권고 제목", html)                           # ① 결재 권고
@@ -315,7 +320,7 @@ class AgentLoop(Base):
         self.assertIn("가짜 제외 근거입니다.", html)
 
         runs = [json.loads(p) for a, p in self.audit() if a.startswith("AI 에이전트 실행")]
-        self.assertEqual(len(runs), 3)
+        self.assertEqual(len(runs), 4)                                # 소명 검토 2회(첫 소명·보완) + 결재 권고 + 대안 설명
         self.assertEqual([t["tool"] for t in runs[0]["tool_calls"]], ["get_limit_check", "get_corevia_finance", "read_document"])
         self.assertFalse(runs[0]["tool_calls"][2]["ok"])              # 틀린 문서 이름은 오류로 기록
 

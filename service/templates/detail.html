@@ -134,8 +134,16 @@
   {% endif %}
 
   {% if st == 'PENDING' or r.resolutions %}
-  <div class="card {{ 'hold' if st=='PENDING' }}">
+  <div class="card {{ 'hold' if st=='PENDING' }}" id="hold">
     <h2>{{ '⚠ 지급 보류 · 사유 소명 요망' if st=='PENDING' else '보류 처리 이력' }}</h2>
+    {% if st=='PENDING' and r.risk %}
+    <p><b>보류 사유</b>: {% for c in r.risk.checks if c.key in r.risk.hold %}{{ c.label }} · {{ c.detail }}{{ ' / ' if not loop.last }}{% endfor %}</p>
+    <p class="small">보류는 내부 기준(품질팀 판정 건수)만으로 정해졌습니다.{% for c in r.risk.checks if c.key=='news' and c.result=='info' %} 외부 품질 보도는 미확정이라 보류 근거에서 뺐습니다.{% endfor %} 이 단계는 규칙 검사이고, AI 에이전트는 소명이 제출되면 검토합니다.</p>
+    {% endif %}
+    {% set need = r.ai.get('need_supplement') %}
+    {% if st=='PENDING' and need and (threads|selectattr('kind','equalto','explain')|selectattr('role','equalto','영업팀')|list|length) < need %}
+    <div class="card crit"><b>AI 소명 검토: 보완 소명 필요</b><span class="small">{% if r.ai.explain and r.ai.explain.missing %}더 받아야 할 것: {{ r.ai.explain.missing|join(' / ') }}. {% endif %}영업팀이 보완 소명을 제출해야 품질팀이 해제할 수 있습니다.</span></div>
+    {% endif %}
     <div class="thread">
       {% for t in threads %}<div class="msg"><b>{{ t.role }}</b> <span class="small mono">{{ t.at }}</span><br>{{ t.body }}</div>{% endfor %}
       {% for k, v in r.resolutions.items() %}<div class="msg"><b>{{ v.by }}</b> <span class="small mono">{{ v.at }}</span><br>보류 해제({{ v.label }}) {{ v.memo }}</div>{% endfor %}
@@ -168,7 +176,7 @@
 
   {% if st in ('AWAITING_APPROVAL','PAID','REJECTED','ALT_PROPOSED','CREDIT_SCHEDULED','CREDIT_SETTLED') or approvals %}
   {% set c = r.cash %}
-  <div class="card">
+  <div class="card" id="approval">
     <h2>결재</h2>
     <p><b>동일 관련자 {{ members|length }}곳의 합산 장려금이 월 한도 {{ r.agg.limit_total|won }}을 넘어 영업임원 승인이 필요합니다{% if r.match.candidates %} ({% for x in r.match.candidates if x.agency_id in members %}{{ x.agency_id }} {{ x.score }}/{{ x.max }}개 일치{{ ', ' if not loop.last }}{% endfor %}){% endif %}.</b> 장려금 {{ r.agg.amount|won }} (요율 {{ r.agg.rate|pct }}, 일반 대비 {{ '+' if r.agg.diff>=0 }}{{ r.agg.diff|won }})</p>
     {% set od = (r.risk.checks|selectattr('key','equalto','overdue')|list)[0] if r.risk else None %}
@@ -182,11 +190,22 @@
     </div>
     {% endif %}
     {% if c %}
-    <div class="card dash">
+    {% set declining = c.cv_decline_months and c.cv_decline_months >= 2 %}
+    <div class="card {{ 'hold' if declining else 'dash' }}" id="cash">
       <span class="small">Corevia 자체 현금 근거 ({{ as_of }})</span>
-      <div class="row"><span class="small" style="width:64px">현금</span><span class="pill {{ 'warn' if c.cv_decline_months and c.cv_decline_months >= 2 else 'ok' }}">{{ c.cv_close|eok }}{% if c.cv_decline_months %} · {{ c.cv_decline_months }}개월 연속 감소 {{ c.cv_decline_amount|eok }}{% endif %}</span>
-        {% if c.cv_series %}<span class="small mono">{% for k, v in c.cv_series %}{{ k[5:] }}월 {{ v|eok }}{{ ' → ' if not loop.last }}{% endfor %}</span>{% endif %}</div>
-      {% if c.cv_ar_over %}<div class="row"><span class="small" style="width:64px">채권</span><span class="pill warn">{{ RULES.overdue_days }}일 초과 미회수 {{ c.cv_ar_over|eok }} ({{ c.cv_ar_over_n }}건)</span><span class="small">전체 미회수 {{ c.cv_ar_total|eok }} · 대리점분 {{ c.cv_ar_over_agency|eok }}</span></div>{% endif %}
+      {% if declining and c.cv_series and c.cv_series|length > c.cv_decline_months %}
+      <b class="cashhead">⚠ Corevia 현금 {{ c.cv_decline_months }}개월 연속 감소 · {{ c.cv_series[-1 - c.cv_decline_months][1]|eok }} → {{ c.cv_close|eok }} 원 ({{ c.cv_decline_amount|eok }} 원)</b>
+      {% else %}
+      <b class="cashhead">Corevia 현금 {{ c.cv_close|eok }} 원{% if c.cv_decline_months %} · 전월 대비 감소 {{ c.cv_decline_amount|eok }} 원{% endif %}</b>
+      {% endif %}
+      {% if c.cv_series %}
+      {% set lo = 0 %}
+      {% set hi = c.cv_series|map(attribute=1)|max %}
+      <div class="cashbars">
+        {% for k, v in c.cv_series %}<span>{{ k[5:] }}월 말</span><span class="track"><i style="width:{{ ((v - lo) / (hi - lo) * 100) if hi > lo else 100 }}%"></i></span><span class="mono">{{ v|eok }}</span>{% endfor %}
+      </div>
+      {% endif %}
+      {% if c.cv_ar_over %}<div class="row"><span class="pill warn">{{ RULES.overdue_days }}일 초과 미회수 채권 {{ c.cv_ar_over|eok }} ({{ c.cv_ar_over_n }}건)</span><span class="small">전체 미회수 {{ c.cv_ar_total|eok }} · 대리점분 {{ c.cv_ar_over_agency|eok }}</span></div>{% endif %}
       <span class="small">출처: fin_cash_daily_cv · fin_ar_aging_cv</span>
     </div>
     <div class="card dash">
@@ -239,7 +258,7 @@
   {% if r.alt %}
   {% set al = r.alt %}
   {% set split = r.alt_accept.get('plan')=='split' %}
-  <div class="card ai">
+  <div class="card ai" id="alt">
     <span class="ai-tag">AI 대안 · 거절 사유 CASH_SHORTAGE 감지</span>
     <h2>{{ al.channel.channel_name }}({{ al.channel.channel_id }}) 다음 발주에서 '재고 할인(Credit)'으로 대체 지급</h2>
     {% if r.ai.alt %}
@@ -284,7 +303,7 @@
   {% endif %}
 
   {% if credit %}
-  <div class="card {{ 'okb' }}">
+  <div class="card {{ 'okb' }}" id="credit">
     <h2>{% if st=='CASH_PENDING' %}크레딧 차감 완료 · 이연 현금분 지급 대기{% elif credit.status=='SETTLED' %}{{ '분할 정산 완료' if credit.cash_amount else '크레딧 정산 완료' }}{% else %}지급 계획 변경 완료 · 크레딧 예약{% endif %}</h2>
     <dl class="kv"><dt>크레딧</dt><dd class="mono">CR-{{ '%04d'|format(credit.id) }} · {{ credit.amount|won }}{% if credit.cash_amount %} (+ 이연 현금 {{ credit.cash_amount|won }}){% endif %}</dd>
       <dt>채널</dt><dd>{{ credit.channel }}</dd><dt>유효기간</dt><dd class="mono">~{{ credit.valid_to }}</dd>
@@ -311,7 +330,7 @@
   {% endif %}
 
   {% if st=='PAID' %}
-  <div class="card okb">
+  <div class="card okb" id="paid">
     <h2>{{ r.agg.amount|won }} 현금 지급 처리</h2>
     <div class="tbl"><table><thead><tr><th>장려금 ID</th><th>대리점</th><th class="num">금액</th><th>계좌</th></tr></thead><tbody>
       {% for mb in r.agg.members %}<tr><td class="mono">{{ mb.rebate_ids|join(', ') }}</td><td>{{ mb.agency_id }} {{ mb.agency_name }}</td><td class="num">{{ mb.rebate|won }}</td><td class="mono small">{{ mb.account }}</td></tr>{% endfor %}
