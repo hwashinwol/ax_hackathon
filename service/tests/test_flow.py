@@ -166,8 +166,20 @@ class Flow(Base):
         self.post("영업팀", "/requests/1/alt/accept")
         self.post("재무팀", "/requests/1/alt/accept")
         self.assertEqual(self.status(), "CREDIT_SCHEDULED")
-        self.post("Masil", "/requests/1/credit/settle", po="SPO-0005")
+        self.assertIn("SPO-0005 · SKU-2001", html := self.page("Masil", "/requests/1"))   # 발주 내역에서 고르는 목록
+        self.assertNotIn('value="SPO-0001"', html)                     # 확정 결함 품목 발주서는 목록에 없음
+        html = self.post("Masil", "/requests/1/credit/settle", po="PO-없는번호")
+        self.assertIn("발주 내역(sc_purchase_orders_ms)에 없는", html)
+        html = self.post("Masil", "/requests/1/credit/settle", po="SPO-0001")
+        self.assertIn("확정 결함 품목 발주서", html)
+        self.assertEqual(self.status(), "CREDIT_SCHEDULED")
+        html = self.post("Masil", "/requests/1/credit/settle", po="SPO-0005")
         self.assertEqual(self.status(), "CREDIT_SETTLED")
+        self.assertIn("발주 내역 대조 완료", html)
+        self.assertIn("197,711,903원", html)                           # 201,600,000 − 3,888,097
+        settled = [json.loads(p) for a, p in self.audit() if a.startswith("Masil 발주서 크레딧 차감 확인")][0]
+        self.assertTrue(settled["verified"])
+        self.assertEqual(settled["payable_after"], 197711903)
 
     def test_scenario3_split_deferred_cash(self):
         """분할안: 크레딧 차감 확인 → 이연 현금분 지급 대기 → 재무팀 지급으로 정산 완료."""

@@ -90,6 +90,8 @@ class Workflow:
         res, err = agent.safe_run(self, rid, task, self.ai_client)
         label = {"review": "결재 권고", "explain": "소명 검토", "alt": "대안 설명"}[task]
         if res:
+            if task == "explain":       # 스레드에 붙는 글이라 추가 요청은 3개까지만 남긴다
+                res["output"]["missing"] = res["output"]["missing"][:3]
             ai = self.get(rid)["ai"]
             ai[task] = {**res["output"], "model": res["model"], "tools": [t["tool"] for t in res["trace"]], "at": now()}
             self._set(rid, ai_json=J(ai))
@@ -435,22 +437,46 @@ class Workflow:
         self.move(rid, actor, "CLOSED", "대안 거절 · 종결", {"memo": memo})
         self.con.commit()
 
+    def po_used(self, po):
+        """이 발주서에서 이미 차감 확정된 크레딧 합계."""
+        return self.con.execute("SELECT COALESCE(SUM(amount),0) FROM credits WHERE masil_po=? AND status='SETTLED'", (po,)).fetchone()[0]
+
+    def _check_po(self, po, credit, settlement):
+        """발주서를 Masil 발주 내역과 대조한다. 발주 파일이 없으면({}) 번호만 기록한다."""
+        rows = (settlement or {}).get("rows") or []
+        if not rows:
+            return {"verified": False}
+        row = next((x for x in rows if x[0] == po), None)
+        if not row:
+            raise WorkflowError(f"{po}는 Masil 발주 내역(sc_purchase_orders_ms)에 없는 발주서입니다. 목록에서 고르세요.")
+        if row[5]:
+            raise WorkflowError(f"{po}({row[1]})는 확정 결함 품목 발주서라 크레딧 차감 대상이 아닙니다.")
+        left = row[3] - self.po_used(po)
+        if left < credit:
+            raise WorkflowError(f"{po}의 남은 발주 대금 {left:,}원이 크레딧 {credit:,}원보다 적습니다. 다른 발주서를 고르세요.")
+        return {"verified": True, "sku": row[1], "payment_due": row[4], "po_amount": row[3],
+                "deducted_before": row[3] - left, "credit": credit, "payable_after": left - credit,
+                "source": "sc_purchase_orders_ms"}
+
     def settle_credit(self, rid, actor, po):
         r = self.get(rid)
         self._need(r, "CREDIT_SCHEDULED", "Masil", actor)
-        if not po.strip():
-            raise WorkflowError("반영된 발주서(PO) 번호를 입력하세요.")
-        self.con.execute("UPDATE credits SET status='SETTLED', masil_po=?, settled_at=? WHERE request_id=?", (po, now(), rid))
-        cr = self.con.execute("SELECT cash_amount FROM credits WHERE request_id=?", (rid,)).fetchone()
+        po = po.strip()
+        if not po:
+            raise WorkflowError("크레딧을 차감할 발주서(PO)를 고르세요.")
+        cr = self.con.execute("SELECT amount, cash_amount FROM credits WHERE request_id=?", (rid,)).fetchone()
         cash_amt = cr["cash_amount"] if cr else 0
+        # Masil 발주 내역(sc_purchase_orders_ms)과 대조한다: 실제 있는 발주서인지, 제외 품목이 아닌지, 차감할 잔액이 남았는지
+        check = self._check_po(po, cr["amount"] if cr else 0, (r["alt"] or {}).get("settlement"))
+        self.con.execute("UPDATE credits SET status='SETTLED', masil_po=?, settled_at=? WHERE request_id=?", (po, now(), rid))
         if cash_amt:    # 분할안: 크레딧은 끝났고 이연 현금분이 남았다
             self.move(rid, actor, "CASH_PENDING", "Masil 발주서 크레딧 차감 확인 · 이연 현금분 지급 대기",
-                      {"po": po, "deferred_cash": cash_amt})
+                      {"po": po, "deferred_cash": cash_amt, **check})
             self.notify(rid, ["재무팀"], f"{r['code']} · 크레딧 차감 완료({po}). 이연 현금 {cash_amt:,}원은 "
                         "이 그룹 연체 채권 회수 확인 후 지급하세요", "warn")
             self.notify(rid, ["영업팀"], f"{r['code']} · 크레딧 차감 완료 ({po}), 현금분 {cash_amt:,}원 지급 대기")
         else:
-            self.move(rid, actor, "CREDIT_SETTLED", "Masil 발주서 크레딧 차감 확인", {"po": po})
+            self.move(rid, actor, "CREDIT_SETTLED", "Masil 발주서 크레딧 차감 확인", {"po": po, **check})
             self.notify(rid, ["영업팀", "재무팀"], f"{r['code']} · 크레딧 정산 완료 ({po})", "ok")
         self.con.commit()
 

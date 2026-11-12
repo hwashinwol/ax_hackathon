@@ -137,6 +137,18 @@ def create_app(data_dir=DATA_DIR, db_path=DB_PATH, ai_client=None):
         threads = [dict(t) for t in w.con.execute("SELECT * FROM threads WHERE request_id=? ORDER BY id", (rid,))]
         credit = w.con.execute("SELECT * FROM credits WHERE request_id=?", (rid,)).fetchone()
         audit = [dict(a) for a in w.con.execute("SELECT * FROM audit_log WHERE request_id=? ORDER BY id DESC", (rid,))]
+        # 크레딧을 차감할 발주서 후보: Masil 발주 내역에서 제외 품목을 빼고 지급일이 빠른 순으로
+        po_opts, po_info = [], None
+        st_rows = ((r["alt"] or {}).get("settlement") or {}).get("rows") or []
+        if credit:
+            for x in sorted(st_rows, key=lambda x: (x[4], x[0])):
+                if not x[5]:
+                    left = x[3] - w.po_used(x[0])
+                    po_opts.append({"po": x[0], "sku": x[1], "amount": x[3], "due": x[4], "left": left,
+                                    "ok": left >= credit["amount"]})
+            row = next((x for x in st_rows if x[0] == credit["masil_po"]), None)
+            if row:
+                po_info = {"sku": row[1], "amount": row[3], "due": row[4]}
         rec = None
         if r["status"] == "AWAITING_APPROVAL" and r["agg"] and r["risk"]:
             ai = r["ai"].get("review")
@@ -147,8 +159,9 @@ def create_app(data_dir=DATA_DIR, db_path=DB_PATH, ai_client=None):
                 rec = engine.recommend(r["match"], members, r["agg"], r["risk"], r["cash"])
                 rec["source"] = "규칙 기반 (AI 에이전트 미연결)"
         return render_template("detail.html", r=r, members=members, approvals=approvals, threads=threads, rec=rec,
-                               credit=dict(credit) if credit else None, audit=audit,
+                               credit=dict(credit) if credit else None, audit=audit, po_opts=po_opts, po_info=po_info,
                                next_approver=w.next_approver(rid), chain=APPROVAL_CHAIN,
+                               mal_n=sum(1 for j in w.judgments() if j["agency_id"] in members),
                                reasons=REJECT_REASONS, anchor=app.config["DATA"].agency(r["anchor_id"]))
 
     # ── 액션 ──
